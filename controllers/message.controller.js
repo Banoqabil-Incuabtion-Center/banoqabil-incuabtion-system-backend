@@ -64,6 +64,7 @@ exports.sendMessage = async (req, res) => {
         try {
             const io = getIO();
             io.to(receiverId).emit("newMessage", newMessage);
+            io.to(senderId).emit("newMessage", newMessage); // Sync sender's other devices
 
             // Send Push Notification
             // We need sender details for the push notification title/body
