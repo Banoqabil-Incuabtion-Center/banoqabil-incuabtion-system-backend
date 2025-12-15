@@ -239,7 +239,7 @@ commentController.getCommentsByPost = async (req, res) => {
       pagination: {
         currentPage: page,
         totalPages: Math.ceil(commentTree.length / limit),
-        totalItems: commentTree.length,
+        totalItems: allComments.length,
         itemsPerPage: limit,
         hasNextPage: endIndex < commentTree.length,
         hasPrevPage: page > 1
