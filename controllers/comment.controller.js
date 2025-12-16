@@ -365,7 +365,8 @@ commentController.deleteComment = async (req, res) => {
       const io = getIO();
       io.to(`post:${comment.post}`).emit('comment:deleted', {
         commentId: id,
-        parentCommentId: comment.parentComment
+        parentCommentId: comment.parentComment,
+        postId: comment.post
       });
     } catch (socketError) {
       console.error('Socket emission error:', socketError);

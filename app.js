@@ -40,7 +40,6 @@ app.use(
       process.env.ADMIN_URL,
       process.env.USER_URL,
       process.env.LOCAL_URL,
-      "https://banoqabil-incubatees.vercel.app",
       "https://ims-frontend-admin.vercel.app",
     ].filter(Boolean),
     credentials: true,

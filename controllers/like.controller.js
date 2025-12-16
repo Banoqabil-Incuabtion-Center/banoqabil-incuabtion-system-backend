@@ -154,6 +154,7 @@ likeController.toggleCommentLike = async (req, res) => {
             // Emit Socket.IO event
             const io = getIO();
             io.to(`post:${postId}`).emit("comment:like:removed", {
+                postId,
                 commentId,
                 userId,
                 likeCount,
@@ -180,6 +181,7 @@ likeController.toggleCommentLike = async (req, res) => {
             // Emit Socket.IO event
             const io = getIO();
             io.to(`post:${postId}`).emit("comment:like:added", {
+                postId,
                 commentId,
                 like: {
                     _id: newLike._id,
