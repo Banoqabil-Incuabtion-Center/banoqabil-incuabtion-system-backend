@@ -117,6 +117,7 @@ exports.getMessages = async (req, res) => {
     try {
         const { id: receiverId } = req.params;
         const senderId = req.user.id;
+        const { limit = 50, before } = req.query;
 
         const conversation = await Conversation.findOne({
             participants: { $all: [senderId, receiverId] },
@@ -126,13 +127,20 @@ exports.getMessages = async (req, res) => {
             return res.status(200).json([]);
         }
 
-        const messages = await Message.find({
-            conversationId: conversation._id,
-        })
-            .populate("sender", "name avatar email")
-            .sort({ createdAt: 1 }); // Sorting by oldest first
+        const query = { conversationId: conversation._id };
 
-        res.status(200).json(messages);
+        // If 'before' timestamp is provided, fetch messages older than that
+        if (before) {
+            query.createdAt = { $lt: new Date(before) };
+        }
+
+        const messages = await Message.find(query)
+            .populate("sender", "name avatar email")
+            .sort({ createdAt: -1 }) // Get newest first (simplifies pagination logic)
+            .limit(parseInt(limit));
+
+        // Reverse to return in chronological order (oldest -> newest) for the frontend
+        res.status(200).json(messages.reverse());
     } catch (error) {
         console.error("Error in getMessages:", error);
         res.status(500).json({ error: "Internal server error" });
