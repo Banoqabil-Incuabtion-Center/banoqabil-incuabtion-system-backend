@@ -242,7 +242,8 @@ authController.loginPost = async (req, res, next) => {
         email: user.email,
         name: user.name,
         bq_id: user.bq_id,
-        avatar: user.avatar
+        avatar: user.avatar,
+        cardSettings: user.cardSettings
       },
       loginInfo: {
         device: deviceInfo.device,
@@ -322,7 +323,7 @@ authController.getUserById = async (req, res, next) => {
       return res.status(400).json({ error: "Invalid User ID" });
     }
 
-    const user = await userModel.findById(id).select('name avatar bq_id email incubation_id shift course gender bio status');
+    const user = await userModel.findById(id).select('name avatar bq_id email incubation_id shift course gender bio status cardSettings');
 
     if (!user) {
       return res.status(404).json({ error: "User not found" });
@@ -450,7 +451,7 @@ authController.getActiveUsers = async (req, res, next) => {
     const activeUserIds = Array.from(activeUsers.keys());
     const users = await userModel.find({
       _id: { $in: activeUserIds }
-    }).select('name email bq_id avatar');
+    }).select('name email bq_id avatar cardSettings');
 
     const result = users.map(user => {
       const activityData = activeUsers.get(user._id.toString());
@@ -473,7 +474,7 @@ authController.getActiveUsers = async (req, res, next) => {
 authController.updateUser = async (req, res, next) => {
   try {
     const { _id } = req.params;
-    let { bq_id, name, bio, status, email, phone, CNIC, course, gender, shift } = req.body;
+    let { bq_id, name, bio, status, email, phone, CNIC, course, gender, shift, cardSettings } = req.validatedData;
 
     if (email) {
       email = email.toLowerCase();
@@ -519,10 +520,10 @@ authController.updateUser = async (req, res, next) => {
     }
 
     const updateData = {};
-    const fields = ['bq_id', 'name', 'bio', 'status', 'email', 'phone', 'CNIC', 'course', 'gender', 'shift'];
+    const fields = ['bq_id', 'name', 'bio', 'status', 'email', 'phone', 'CNIC', 'course', 'gender', 'shift', 'cardSettings'];
     fields.forEach(field => {
-      if (req.body[field] !== undefined) {
-        updateData[field] = req.body[field];
+      if (req.validatedData[field] !== undefined) {
+        updateData[field] = req.validatedData[field];
       }
     });
 

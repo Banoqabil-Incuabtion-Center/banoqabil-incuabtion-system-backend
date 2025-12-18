@@ -79,6 +79,15 @@ const userSchema = new mongoose.Schema({
     type: Date,
     default: null,
   },
+  cardSettings: {
+    theme: { type: String, default: 'default' }, // default, glass, gradient, dark
+    accentColor: { type: String, default: 'primary' },
+    borderRadius: { type: String, default: 'rounded-2xl' },
+    showStatus: { type: Boolean, default: true },
+    backgroundColor: { type: String, default: '' }, // Custom hex or class
+    textColor: { type: String, default: '' }, // Custom hex or class
+    gradient: { type: String, default: '' }, // Gradient preset name
+  },
 });
 
 // Pre-save hook to generate incubation_id

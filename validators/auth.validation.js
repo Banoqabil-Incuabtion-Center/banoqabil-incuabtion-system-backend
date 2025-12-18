@@ -18,6 +18,15 @@ const registerSchema = z.object({
 const updateRegisterSchema = registerSchema.omit({ password: true, termsAccepted: true }).partial().extend({
   bio: z.string().max(200, 'Bio is too long').optional(),
   status: z.string().max(40, 'Status is too long').optional(),
+  cardSettings: z.object({
+    theme: z.string().optional(),
+    accentColor: z.string().optional(),
+    borderRadius: z.string().optional(),
+    showStatus: z.boolean().optional(),
+    backgroundColor: z.string().optional(),
+    textColor: z.string().optional(),
+    gradient: z.string().optional(),
+  }).optional(),
 });
 
 
