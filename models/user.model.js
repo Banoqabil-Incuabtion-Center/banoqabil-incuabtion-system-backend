@@ -10,6 +10,14 @@ const userSchema = new mongoose.Schema({
     unique: true,
   },
   name: String,
+  bio: {
+    type: String,
+    default: "",
+  },
+  status: {
+    type: String,
+    default: "",
+  },
   email: {
     type: String,
     unique: true,

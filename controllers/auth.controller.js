@@ -313,6 +313,27 @@ authController.loginGet = async (req, res, next) => {
   }
 };
 
+// ✅ Get user by ID (Public Profile)
+authController.getUserById = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    if (!isValidObjectId(id)) {
+      return res.status(400).json({ error: "Invalid User ID" });
+    }
+
+    const user = await userModel.findById(id).select('name avatar bq_id email incubation_id shift course gender bio status');
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    res.status(200).json({ user });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // ✅ Logout - WITH ACTIVITY TRACKING
 authController.logout = async (req, res, next) => {
   try {
@@ -452,7 +473,7 @@ authController.getActiveUsers = async (req, res, next) => {
 authController.updateUser = async (req, res, next) => {
   try {
     const { _id } = req.params;
-    let { bq_id, name, email, phone, CNIC, course, gender, shift } = req.body;
+    let { bq_id, name, bio, status, email, phone, CNIC, course, gender, shift } = req.body;
 
     if (email) {
       email = email.toLowerCase();
@@ -497,9 +518,17 @@ authController.updateUser = async (req, res, next) => {
       }
     }
 
+    const updateData = {};
+    const fields = ['bq_id', 'name', 'bio', 'status', 'email', 'phone', 'CNIC', 'course', 'gender', 'shift'];
+    fields.forEach(field => {
+      if (req.body[field] !== undefined) {
+        updateData[field] = req.body[field];
+      }
+    });
+
     await userModel.findByIdAndUpdate(
       _id,
-      { bq_id, name, email, phone, CNIC, course, gender, shift },
+      { $set: updateData },
       { new: true, runValidators: true }
     );
 

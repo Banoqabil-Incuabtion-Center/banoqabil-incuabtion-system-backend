@@ -15,7 +15,10 @@ const registerSchema = z.object({
   }),
 });
 
-const updateRegisterSchema = registerSchema.omit({ password: true, termsAccepted: true });
+const updateRegisterSchema = registerSchema.omit({ password: true, termsAccepted: true }).partial().extend({
+  bio: z.string().max(200, 'Bio is too long').optional(),
+  status: z.string().max(40, 'Status is too long').optional(),
+});
 
 
 // const updateRegisterSchema = z.object({
