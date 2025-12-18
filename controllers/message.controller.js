@@ -99,12 +99,18 @@ exports.sendMessage = async (req, res) => {
 exports.getConversations = async (req, res) => {
     try {
         const senderId = req.user.id;
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const skip = (page - 1) * limit;
+
         const conversations = await Conversation.find({
             participants: senderId,
         })
             .populate("participants", "name avatar email") // Populate participant details
             .populate("lastMessage")
-            .sort({ updatedAt: -1 }); // Latest conversations first
+            .sort({ updatedAt: -1 }) // Latest conversations first
+            .skip(skip)
+            .limit(limit);
 
         res.status(200).json(conversations);
     } catch (error) {
