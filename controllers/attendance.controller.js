@@ -13,6 +13,15 @@ const isValidObjectId = (id) => {
     /^[0-9a-fA-F]{24}$/.test(id);
 };
 
+// ✅ Helper to normalize IP (removes IPv6 prefix)
+const normalizeIP = (ip) => {
+  if (!ip) return ip;
+  if (ip.startsWith("::ffff:")) {
+    return ip.split(":").pop();
+  }
+  return ip;
+};
+
 // ✅ Get settings (cached for performance)
 let cachedSettings = null;
 let cacheTime = null;
@@ -140,11 +149,21 @@ attendanceController.checkin = async (req, res, next) => {
       ...settings.allowedIPs
     ].filter(Boolean);
 
-    const clientIP = req.headers["x-forwarded-for"]?.split(",")[0] || req.connection.remoteAddress;
-    console.log("Client IP:", clientIP);
+    const rawIP = req.headers["x-forwarded-for"]?.split(",")[0] || req.connection.remoteAddress;
+    const clientIP = normalizeIP(rawIP);
+
+    console.log("--- Check-in Debug ---");
+    console.log("Raw IP:", rawIP);
+    console.log("Normalized IP:", clientIP);
+    console.log("Allowed IPs:", allowedIPs);
+    console.log("----------------------");
 
     if (allowedIPs.length > 0 && !allowedIPs.includes(clientIP)) {
-      return res.status(403).json({ error: "Attendance only allowed from incubation network" });
+      console.warn(`Blocked check-in attempt from unauthorized IP: ${clientIP}`);
+      return res.status(403).json({
+        error: "Attendance only allowed from incubation network",
+        yourIP: clientIP
+      });
     }
 
     if (!_id || _id === 'undefined' || _id === 'null') {
@@ -245,10 +264,21 @@ attendanceController.checkout = async (req, res, next) => {
       ...settings.allowedIPs
     ].filter(Boolean);
 
-    const clientIP = req.headers["x-forwarded-for"]?.split(",")[0] || req.connection.remoteAddress;
+    const rawIP = req.headers["x-forwarded-for"]?.split(",")[0] || req.connection.remoteAddress;
+    const clientIP = normalizeIP(rawIP);
+
+    console.log("--- Check-out Debug ---");
+    console.log("Raw IP:", rawIP);
+    console.log("Normalized IP:", clientIP);
+    console.log("Allowed IPs:", allowedIPs);
+    console.log("-----------------------");
 
     if (allowedIPs.length > 0 && !allowedIPs.includes(clientIP)) {
-      return res.status(403).json({ error: "Attendance only allowed from incubation network" });
+      console.warn(`Blocked check-out attempt from unauthorized IP: ${clientIP}`);
+      return res.status(403).json({
+        error: "Attendance only allowed from incubation network",
+        yourIP: clientIP
+      });
     }
 
     if (!_id || !isValidObjectId(_id)) {
