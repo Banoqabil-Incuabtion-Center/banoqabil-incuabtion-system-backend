@@ -21,4 +21,7 @@ router.put("/settings", attendanceController.updateSettings);
 router.put("/update/:attendanceId", validateObjectId('attendanceId'), attendanceController.updateAttendanceRecord);
 router.delete("/delete/:attendanceId", validateObjectId('attendanceId'), attendanceController.deleteAttendanceRecord);
 
+// Debug routes
+router.get("/check-ip", attendanceController.checkIP);
+
 module.exports = router;

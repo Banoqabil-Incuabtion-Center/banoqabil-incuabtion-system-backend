@@ -147,7 +147,7 @@ attendanceController.checkin = async (req, res, next) => {
       process.env.IP_ADDRESS_ONE,
       process.env.IP_ADDRESS_TWO,
       ...settings.allowedIPs
-    ].filter(Boolean);
+    ].filter(Boolean).map(ip => ip.trim());
 
     const rawIP = req.headers["x-forwarded-for"]?.split(",")[0] || req.connection.remoteAddress;
     const clientIP = normalizeIP(rawIP);
@@ -162,7 +162,8 @@ attendanceController.checkin = async (req, res, next) => {
       console.warn(`Blocked check-in attempt from unauthorized IP: ${clientIP}`);
       return res.status(403).json({
         error: "Attendance only allowed from incubation network",
-        yourIP: clientIP
+        yourIP: clientIP,
+        allowedIPs: allowedIPs // Temporarily show allowed IPs for debugging
       });
     }
 
@@ -262,7 +263,7 @@ attendanceController.checkout = async (req, res, next) => {
       process.env.IP_ADDRESS_ONE,
       process.env.IP_ADDRESS_TWO,
       ...settings.allowedIPs
-    ].filter(Boolean);
+    ].filter(Boolean).map(ip => ip.trim());
 
     const rawIP = req.headers["x-forwarded-for"]?.split(",")[0] || req.connection.remoteAddress;
     const clientIP = normalizeIP(rawIP);
@@ -277,7 +278,8 @@ attendanceController.checkout = async (req, res, next) => {
       console.warn(`Blocked check-out attempt from unauthorized IP: ${clientIP}`);
       return res.status(403).json({
         error: "Attendance only allowed from incubation network",
-        yourIP: clientIP
+        yourIP: clientIP,
+        allowedIPs: allowedIPs // Temporarily show allowed IPs for debugging
       });
     }
 
@@ -825,6 +827,32 @@ attendanceController.getUserHistoryForCalendar = async (req, res, next) => {
     });
   } catch (err) {
     next(err);
+  }
+};
+
+// ✅ 13. Debug IP (Check what IP server sees)
+attendanceController.checkIP = async (req, res) => {
+  try {
+    const settings = await getSettings();
+    const rawIP = req.headers["x-forwarded-for"]?.split(",")[0] || req.connection.remoteAddress;
+    const clientIP = normalizeIP(rawIP);
+
+    res.json({
+      rawIP,
+      clientIP,
+      allowedIPs: [
+        process.env.IP_ADDRESS_ONE,
+        process.env.IP_ADDRESS_TWO,
+        ...settings.allowedIPs
+      ].filter(Boolean).map(ip => ip.trim()),
+      env: {
+        hasEnv1: !!process.env.IP_ADDRESS_ONE,
+        hasEnv1: !!process.env.IP_ADDRESS_ONE,
+        hasEnv2: !!process.env.IP_ADDRESS_TWO
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 };
 
