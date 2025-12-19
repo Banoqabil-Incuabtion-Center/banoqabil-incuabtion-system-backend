@@ -30,7 +30,8 @@ router.post("/avatar", protect, uploadAvatar.single('avatar'), authController.up
 // Post routes with image upload
 router.post("/createpost", protect, uploadPostImage.single('image'), userPostController.createUserPost);
 router.get("/getuserpost", protect, userPostController.getUserPosts);
-router.get("/getuserpost/stats", protect, userPostController.getUserPostsWithStats); // Optimized with like/comment counts
+router.get("/getuserpost/stats", protect, userPostController.getUserPostsWithStats);
+router.get("/getuserpost/:id", protect, userPostController.getPostDetail);
 router.put("/updateuserpost", protect, uploadPostImage.single('image'), userPostController.updateUserPost);
 router.delete("/deleteuserpost", protect, userPostController.deleteUserPost);
 

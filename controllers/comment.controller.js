@@ -48,6 +48,15 @@ commentController.createComment = async (req, res) => {
       });
     }
 
+    // Character limit for comment
+    if (content.length > 1000) {
+      return res.status(400).json({
+        errors: {
+          content: "Comment cannot exceed 1000 characters"
+        }
+      });
+    }
+
     // Check if post exists
     const post = await userPostModel.findById(postId);
     if (!post || post.deletedAt) {
@@ -182,7 +191,7 @@ commentController.createComment = async (req, res) => {
   }
 };
 
-// Get Comments for a Post (with tree structure)
+// Get Comments for a Post (with tree structure and pagination)
 commentController.getCommentsByPost = async (req, res) => {
   try {
     const { postId } = req.params;
@@ -190,63 +199,86 @@ commentController.getCommentsByPost = async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const userId = req.user?.id;
 
-    // Get all comments for the post (not just root comments)
-    // We need all comments to build the tree
-    const allComments = await commentModel
-      .find({ post: postId, deletedAt: null })
+    // 1. Get total count of all comments for metadata
+    const totalCommentsCount = await commentModel.countDocuments({ post: postId, deletedAt: null });
+
+    // 2. Get paginated root comments (top-level only)
+    const rootCommentsPaginated = await paginate({
+      model: commentModel,
+      page,
+      limit,
+      query: { post: postId, parentComment: null, deletedAt: null },
+      sort: { createdAt: -1 },
+      populate: { path: 'user', select: 'name avatar' }
+    });
+
+    const rootComments = rootCommentsPaginated.data.map(c => c.toObject ? c.toObject() : c);
+    const rootIds = rootComments.map(c => c._id.toString());
+
+    if (rootComments.length === 0) {
+      return res.status(200).json({
+        data: [],
+        pagination: {
+          currentPage: page,
+          totalPages: 0,
+          totalItems: 0,
+          itemsPerPage: limit,
+          hasNextPage: false,
+          hasPrevPage: false
+        }
+      });
+    }
+
+    // 3. Fetch all replies for the entire post
+    // Note: To be perfectly efficient, we could only fetch descendants of rootIds,
+    // but fetching all replies for a post is generally safe as they are usually fewer than all root comments.
+    const allReplies = await commentModel
+      .find({ post: postId, parentComment: { $ne: null }, deletedAt: null })
       .populate("user", "name avatar")
-      .sort({ createdAt: -1 })
       .lean();
 
-    // Get like counts and user like status for all comments
-    const likeModel = require('../models/like.model');
-    const commentIds = allComments.map(c => c._id);
+    // 4. Combine root comments and replies for likes processing
+    const allRelevantComments = [...rootComments, ...allReplies];
+    const allCommentIds = allRelevantComments.map(c => c._id);
 
-    // Get like counts for all comments
+    // 5. Processing Likes
+    const likeModel = require('../models/like.model');
     const likeCounts = await likeModel.aggregate([
-      { $match: { comment: { $in: commentIds } } },
+      { $match: { comment: { $in: allCommentIds } } },
       { $group: { _id: '$comment', count: { $sum: 1 } } }
     ]);
     const likeCountMap = new Map(likeCounts.map(lc => [lc._id.toString(), lc.count]));
 
-    // Get user's likes if logged in
     let userLikedMap = new Map();
     if (userId) {
       const userLikes = await likeModel.find({
-        comment: { $in: commentIds },
+        comment: { $in: allCommentIds },
         user: userId
       }).lean();
       userLikedMap = new Map(userLikes.map(ul => [ul.comment.toString(), true]));
     }
 
-    // Add likeCount and userLiked to each comment
-    const commentsWithLikes = allComments.map(comment => ({
+    const commentsWithLikes = allRelevantComments.map(comment => ({
       ...comment,
       likeCount: likeCountMap.get(comment._id.toString()) || 0,
       userLiked: userLikedMap.get(comment._id.toString()) || false
     }));
 
-    // Build comment tree
-    const commentTree = await buildCommentTree(commentsWithLikes);
+    // 6. Build comment tree and filter for current page root comments
+    const fullTree = await buildCommentTree(commentsWithLikes);
+    const paginatedTree = fullTree.filter(c => rootIds.includes(c._id.toString()));
 
-    // Paginate only the root comments
-    const startIndex = (page - 1) * limit;
-    const endIndex = page * limit;
-    const paginatedRootComments = commentTree.slice(startIndex, endIndex);
-
-    const result = {
-      data: paginatedRootComments,
+    res.status(200).json({
+      data: paginatedTree,
       pagination: {
         currentPage: page,
-        totalPages: Math.ceil(commentTree.length / limit),
-        totalItems: allComments.length,
+        totalPages: rootCommentsPaginated.pagination.totalPages,
+        totalItems: totalCommentsCount,
         itemsPerPage: limit,
-        hasNextPage: endIndex < commentTree.length,
+        hasNextPage: rootCommentsPaginated.pagination.hasMore,
         hasPrevPage: page > 1
       }
-    };
-
-    res.status(200).json(result);
+    });
   } catch (error) {
     console.error("Error getting comments:", error);
     return res.status(500).json({ message: "Server Error" });
@@ -264,6 +296,11 @@ commentController.updateComment = async (req, res) => {
     if (!content) {
       return res.status(400).json({ message: "Comment content is required" });
     }
+
+    if (content.length > 1000) {
+      return res.status(400).json({ message: "Comment cannot exceed 1000 characters" });
+    }
+
 
     // Check if comment exists and belongs to user
     const comment = await commentModel.findById(id);

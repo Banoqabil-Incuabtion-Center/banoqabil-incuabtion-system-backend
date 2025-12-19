@@ -24,6 +24,24 @@ userPostController.createUserPost = async (req, res) => {
       });
     }
 
+    // Character count validation for title
+    if (title.length > 50) {
+      return res.status(400).json({
+        errors: {
+          title: "Title cannot exceed 50 characters",
+        }
+      });
+    }
+
+    // Character count validation for description
+    if (description.length > 5000) {
+      return res.status(400).json({
+        errors: {
+          description: "Description cannot exceed 5000 characters",
+        }
+      });
+    }
+
     // Handle image upload
     let imageUrl = null;
     if (req.file) {
@@ -234,6 +252,23 @@ userPostController.updateUserPost = async (req, res) => {
       });
     }
 
+    // Validation
+    const errors = {};
+    if (title) {
+      if (title.length > 50) {
+        errors.title = "Title cannot exceed 50 characters";
+      }
+    }
+    if (description) {
+      if (description.length > 5000) {
+        errors.description = "Description cannot exceed 5000 characters";
+      }
+    }
+
+    if (Object.keys(errors).length > 0) {
+      return res.status(400).json({ errors });
+    }
+
     // Handle image update
     let imageUrl = post.image; // Keep existing image by default
 
@@ -339,6 +374,99 @@ userPostController.deleteUserPost = async (req, res) => {
     return res.status(500).json({ message: "Server Error" });
   }
 };
+
+// Get Single Post Detail with Stats
+userPostController.getPostDetail = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    if (!id) {
+      return res.status(400).json({ message: "Post ID is required" });
+    }
+
+    const mongoose = require('mongoose');
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid Post ID" });
+    }
+
+    // Aggregation pipeline for single post with stats
+    const pipeline = [
+      { $match: { _id: new mongoose.Types.ObjectId(id), deletedAt: null } },
+      // Lookup user info
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'user',
+          foreignField: '_id',
+          as: 'userInfo'
+        }
+      },
+      // Lookup likes count
+      {
+        $lookup: {
+          from: 'likes',
+          localField: '_id',
+          foreignField: 'post',
+          as: 'likes'
+        }
+      },
+      // Lookup comments count
+      {
+        $lookup: {
+          from: 'comments',
+          let: { postId: '$_id' },
+          pipeline: [
+            { $match: { $expr: { $eq: ['$post', '$$postId'] }, deletedAt: null } }
+          ],
+          as: 'comments'
+        }
+      },
+      // Add computed fields
+      {
+        $addFields: {
+          likesCount: { $size: '$likes' },
+          commentsCount: { $size: '$comments' },
+          user: { $arrayElemAt: ['$userInfo', 0] },
+          userLiked: {
+            $in: [new mongoose.Types.ObjectId(userId), '$likes.user']
+          }
+        }
+      },
+      // Project fields
+      {
+        $project: {
+          _id: 1,
+          title: 1,
+          description: 1,
+          link: 1,
+          image: 1,
+          createdAt: 1,
+          likesCount: 1,
+          commentsCount: 1,
+          userLiked: 1,
+          'user._id': 1,
+          'user.name': 1,
+          'user.avatar': 1
+        }
+      }
+    ];
+
+    const results = await userPostModel.aggregate(pipeline);
+
+    if (!results || results.length === 0) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+
+    res.status(200).json({
+      post: results[0]
+    });
+  } catch (error) {
+    console.error("Error getting post detail:", error);
+    return res.status(500).json({ message: "Server Error" });
+  }
+};
+
 
 
 module.exports = userPostController;
