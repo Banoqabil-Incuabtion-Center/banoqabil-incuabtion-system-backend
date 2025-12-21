@@ -3,6 +3,7 @@ const User = require("../models/user.model");
 const paginate = require('../utils/paginate.util');
 const { getIO } = require("../socket");
 const mediaController = require('./media.controller');
+const mongoose = require('mongoose');
 
 const userPostController = {};
 
@@ -133,6 +134,7 @@ userPostController.getUserPostsWithStats = async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const userId = req.query.userId; // Optional: filter by user
+    const currentUserId = req.user.id; // Logged in user for like status
 
     const skip = (page - 1) * limit;
 
@@ -183,7 +185,12 @@ userPostController.getUserPostsWithStats = async (req, res) => {
         $addFields: {
           likeCount: { $size: '$likes' },
           commentCount: { $size: '$comments' },
-          user: { $arrayElemAt: ['$userInfo', 0] }
+          likeCount: { $size: '$likes' },
+          commentCount: { $size: '$comments' },
+          user: { $arrayElemAt: ['$userInfo', 0] },
+          userLiked: {
+            $in: [new mongoose.Types.ObjectId(currentUserId), '$likes.user']
+          }
         }
       },
       // Project only needed fields
@@ -196,7 +203,9 @@ userPostController.getUserPostsWithStats = async (req, res) => {
           image: 1,
           createdAt: 1,
           likeCount: 1,
+          likeCount: 1,
           commentCount: 1,
+          userLiked: 1,
           'user._id': 1,
           'user.name': 1,
           'user.avatar': 1
