@@ -1,12 +1,26 @@
 {
   "version": 2,
+  "crons": [
+    {
+      "path": "/api/cron-handler",
+      "schedule": "55 18 * * *"
+    }
+  ],
   "builds": [
+    {
+      "src": "api/*.js",
+      "use": "@vercel/node"
+    },
     {
       "src": "app.js",
       "use": "@vercel/node"
     }
   ],
   "routes": [
+    {
+      "src": "/api/cron-handler",
+      "dest": "api/cron-handler.js"
+    },
     {
       "src": "/(.*)",
       "dest": "app.js"
