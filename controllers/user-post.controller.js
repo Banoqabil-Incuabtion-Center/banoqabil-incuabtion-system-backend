@@ -109,7 +109,7 @@ userPostController.createUserPost = async (req, res) => {
 userPostController.getUserPosts = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 1;
+    const limit = parseInt(req.query.limit) || 10;
 
     const result = await paginate({
       model: userPostModel,
@@ -131,7 +131,7 @@ userPostController.getUserPosts = async (req, res) => {
 userPostController.getUserPostsWithStats = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 1;
+    const limit = parseInt(req.query.limit) || 10;
     const userId = req.query.userId; // Optional: filter by user
 
     const skip = (page - 1) * limit;
