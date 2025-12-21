@@ -41,9 +41,9 @@ const markAbsentJob = async (options = {}) => {
             }
 
             // 2. Check if today is a working day for this user
-            if (!workingDays.includes(todayDay)) {
-                continue; // Not a working day, skip
-            }
+            // if (!workingDays.includes(todayDay)) {
+            //     continue; // Not a working day, skip
+            // }
 
             // 3. Check if attendance exists
             const exists = await Attendance.findOne({
