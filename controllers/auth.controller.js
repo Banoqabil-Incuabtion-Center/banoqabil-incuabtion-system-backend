@@ -242,7 +242,14 @@ authController.loginPost = async (req, res, next) => {
         email: user.email,
         name: user.name,
         bq_id: user.bq_id,
+        incubation_id: user.incubation_id,
+        phone: user.phone,
+        course: user.course,
+        shift: user.shift,
+        workingDays: user.workingDays,
         avatar: user.avatar,
+        bio: user.bio,
+        status: user.status,
         cardSettings: user.cardSettings
       },
       loginInfo: {
