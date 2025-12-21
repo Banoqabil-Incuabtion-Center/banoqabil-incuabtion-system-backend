@@ -324,7 +324,24 @@ attendanceController.checkout = async (req, res, next) => {
     att.isEarlyLeave = isEarlyLeave;
     att.hoursWorked = hoursWorked;
 
+    att.hoursWorked = hoursWorked;
+
     await att.save();
+
+    // Update User Stats
+    const updateOps = {
+      $inc: { "attendanceStats.totalHours": hoursWorked }
+    };
+    if (hoursWorked >= (shiftConfig.minHoursForPresent || 4)) {
+      updateOps.$inc["attendanceStats.present"] = 1;
+    }
+    if (isLate) {
+      updateOps.$inc["attendanceStats.late"] = 1;
+    }
+    // You might also want to track early leaves if needed
+    // if (isEarlyLeave) updateOps.$inc["attendanceStats.earlyLeave"] = 1;
+
+    await User.findByIdAndUpdate(_id, updateOps);
 
     res.json({
       message: "Check-out successful",
@@ -531,7 +548,13 @@ attendanceController.getUserHistoryByName = async (req, res, next) => {
     });
 
     res.json({
-      user: { _id: user._id, name: user.name, email: user.email, shift: user.shift },
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        shift: user.shift,
+        workingDays: user.workingDays // Include workingDays
+      },
       history: result.data,
       pagination: result.pagination
     });
@@ -673,7 +696,8 @@ attendanceController.getShiftInfo = async (req, res, next) => {
         end: `${config.endHour}:00`,
         lateAfter: `${config.startHour + config.lateThresholdMinutes / 60}:00`,
         earlyLeaveBefore: `${config.endHour - config.earlyLeaveThresholdMinutes / 60}:00`,
-        minHours: config.minHoursForPresent
+        minHours: config.minHoursForPresent,
+        workingDays: config.workingDays || [1, 2, 3, 4, 5]
       };
     }
 
@@ -820,7 +844,13 @@ attendanceController.getUserHistoryForCalendar = async (req, res, next) => {
       .lean();
 
     res.json({
-      user: { _id: user._id, name: user.name, email: user.email, shift: user.shift },
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        shift: user.shift,
+        workingDays: user.workingDays
+      },
       records,
       stats,
       startDate: firstRecord?.createdAt || null

@@ -40,6 +40,10 @@ const userSchema = new mongoose.Schema({
     type: String,
     enum: ["Morning", "Evening"],
   },
+  workingDays: {
+    type: [Number], // 0=Sun, 1=Mon, ..., 6=Sat
+    default: null,  // If null, use shift default
+  },
   course: {
     type: String,
     enum: [
@@ -87,6 +91,13 @@ const userSchema = new mongoose.Schema({
     backgroundColor: { type: String, default: '' }, // Custom hex or class
     textColor: { type: String, default: '' }, // Custom hex or class
     gradient: { type: String, default: '' }, // Gradient preset name
+  },
+  attendanceStats: {
+    present: { type: Number, default: 0 },
+    absent: { type: Number, default: 0 },
+    late: { type: Number, default: 0 },
+    leaves: { type: Number, default: 0 },
+    totalHours: { type: Number, default: 0 }
   },
 });
 

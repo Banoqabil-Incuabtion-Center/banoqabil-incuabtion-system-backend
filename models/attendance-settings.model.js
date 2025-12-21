@@ -11,7 +11,8 @@ const AttendanceSettingsSchema = mongoose.Schema({
             lateThresholdMinutes: { type: Number, default: 60 },       // Late after 1 hour
             earlyLeaveThresholdMinutes: { type: Number, default: 60 }, // Early if leave 1hr before end
             noCheckoutLateMinutes: { type: Number, default: 60 },      // Mark late if no checkout after 1hr
-            minHoursForPresent: { type: Number, default: 4 }           // Min 4 hours for valid attendance
+            minHoursForPresent: { type: Number, default: 4 },           // Min 4 hours for valid attendance
+            workingDays: { type: [Number], default: [1, 2, 3, 4, 5] }   // Mon-Fri
         },
         Evening: {
             name: { type: String, default: "Evening" },
@@ -20,7 +21,8 @@ const AttendanceSettingsSchema = mongoose.Schema({
             lateThresholdMinutes: { type: Number, default: 60 },
             earlyLeaveThresholdMinutes: { type: Number, default: 60 },
             noCheckoutLateMinutes: { type: Number, default: 60 },
-            minHoursForPresent: { type: Number, default: 4 }
+            minHoursForPresent: { type: Number, default: 4 },
+            workingDays: { type: [Number], default: [1, 2, 3, 4, 5] }
         }
     },
 
@@ -53,14 +55,16 @@ AttendanceSettingsSchema.statics.getSettings = async function () {
                     endHour: 15,
                     lateThresholdMinutes: 60,
                     earlyLeaveThresholdMinutes: 60,
-                    minHoursForPresent: 4
+                    minHoursForPresent: 4,
+                    workingDays: [1, 2, 3, 4, 5]
                 },
                 Evening: {
                     startHour: 15,
                     endHour: 21,
                     lateThresholdMinutes: 60,
                     earlyLeaveThresholdMinutes: 60,
-                    minHoursForPresent: 4
+                    minHoursForPresent: 4,
+                    workingDays: [1, 2, 3, 4, 5]
                 }
             },
             allowEarlyCheckIn: 60,

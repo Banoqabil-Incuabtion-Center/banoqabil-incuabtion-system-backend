@@ -25,6 +25,9 @@ const likeRoute = require("./routes/like.route");
 const { initializeSocket } = require("./socket");
 const notificationRoute = require("./routes/notification.routes");
 require("./config/db.config")();
+const initAttendanceJobs = require("./jobs/attendance.job");
+initAttendanceJobs(); // Start the cron job
+
 const app = express();
 
 // Create HTTP server
