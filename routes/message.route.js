@@ -7,12 +7,14 @@ const {
     getMessages,
     searchUsers,
     markAsRead,
+    getUnreadCount,
 } = require("../controllers/message.controller");
 
 router.use(protect);
 
 
 router.get("/search", searchUsers);
+router.get("/unread-count", getUnreadCount);
 router.post("/send", sendMessage);
 router.get("/conversations", getConversations);
 router.put("/read", markAsRead);

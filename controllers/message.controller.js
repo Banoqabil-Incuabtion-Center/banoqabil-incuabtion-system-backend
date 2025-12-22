@@ -169,3 +169,30 @@ exports.markAsRead = async (req, res) => {
         res.status(500).json({ error: "Internal server error" });
     }
 };
+
+exports.getUnreadCount = async (req, res) => {
+    try {
+        const userId = req.user.id;
+
+        // Find all conversations the user is part of
+        const conversations = await Conversation.find({ participants: userId })
+            .populate("lastMessage");
+
+        // Count conversations where last message is unread and NOT from current user
+        const unreadCount = conversations.filter(conv => {
+            const lastMessage = conv.lastMessage;
+            if (!lastMessage) return false;
+
+            const senderId = lastMessage.sender.toString();
+            const isFromOther = senderId !== userId;
+            const isUnread = !lastMessage.seenBy.includes(userId);
+
+            return isFromOther && isUnread;
+        }).length;
+
+        res.status(200).json({ unreadCount });
+    } catch (error) {
+        console.error("Error in getUnreadCount:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+};
