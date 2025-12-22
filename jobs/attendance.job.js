@@ -10,12 +10,18 @@ const markAbsentJob = async (options = {}) => {
         console.log(`⏳ Running ${dryRun ? "[DRY RUN] " : ""}automated absence marking job...`);
         const settings = await AttendanceSettings.getSettings();
         const timezone = settings.timezone || "Asia/Karachi";
-        const now = moment().tz(timezone);
-        const todayDay = now.day(); // 0=Sun, 1=Mon...
 
-        // Start/End of today for query
-        const startOfDay = now.clone().startOf("day").toDate();
-        const endOfDay = now.clone().endOf("day").toDate();
+        // Target Date: Yesterday (since this job now runs at 00:30 AM the next day)
+        const now = moment().tz(timezone);
+        const targetDate = now.clone().subtract(1, 'days');
+
+        console.log(`Checking attendance for: ${targetDate.format("YYYY-MM-DD")}`);
+
+        const targetDay = targetDate.day(); // 0=Sun, 1=Mon...
+
+        // Start/End of target day for query
+        const startOfDay = targetDate.clone().startOf("day").toDate();
+        const endOfDay = targetDate.clone().endOf("day").toDate();
 
         // Fetch all active users
         const users = await User.find({ deletedAt: null });
@@ -40,12 +46,12 @@ const markAbsentJob = async (options = {}) => {
                 workingDays = [1, 2, 3, 4, 5];
             }
 
-            // 2. Check if today is a working day for this user
-            if (!workingDays.includes(todayDay)) {
+            // 2. Check if TARGET DATE was a working day for this user
+            if (!workingDays.includes(targetDay)) {
                 continue; // Not a working day, skip
             }
 
-            // 3. Check if attendance exists
+            // 3. Check if attendance exists for TARGET DATE
             const exists = await Attendance.findOne({
                 user: user._id,
                 createdAt: { $gte: startOfDay, $lte: endOfDay }
@@ -62,14 +68,15 @@ const markAbsentJob = async (options = {}) => {
                         checkOutTime: null,
                         hoursWorked: 0,
                         isLate: false,
-                        isEarlyLeave: false
+                        isEarlyLeave: false,
+                        createdAt: startOfDay // Backdate to the start of yesterday to keep records consistent
                     });
 
                     // Increment Absent Count in User Stats
                     await User.findByIdAndUpdate(user._id, { $inc: { "attendanceStats.absent": 1 } });
-                    console.log(`Marked ${user.name} as Absent for ${now.format("YYYY-MM-DD")}`);
+                    console.log(`Marked ${user.name} as Absent for ${targetDate.format("YYYY-MM-DD")}`);
                 } else {
-                    console.log(`[DRY RUN] Would mark ${user.name} as Absent for ${now.format("YYYY-MM-DD")}`);
+                    console.log(`[DRY RUN] Would mark ${user.name} as Absent for ${targetDate.format("YYYY-MM-DD")}`);
                 }
                 markedAbsent++;
             }
@@ -85,12 +92,12 @@ const markAbsentJob = async (options = {}) => {
 };
 
 const initAttendanceJobs = () => {
-    // Run every day at 23:55 (11:55 PM) Pakistan Time
-    cron.schedule("55 23 * * *", markAbsentJob, {
+    // Run every day at 00:30 (12:30 AM) Pakistan Time (checking previous day)
+    cron.schedule("30 0 * * *", markAbsentJob, {
         timezone: "Asia/Karachi"
     });
 
-    console.log("✅ Attendance Cron Job Initialized (23:55 PKT daily)");
+    console.log("✅ Attendance Cron Job Initialized (00:30 PKT daily)");
 };
 
 module.exports = { initAttendanceJobs, markAbsentJob };

@@ -3,7 +3,7 @@
   "crons": [
     {
       "path": "/api/cron-handler",
-      "schedule": "55 18 * * *"
+      "schedule": "30 19 * * *"
     }
   ],
   "builds": [
