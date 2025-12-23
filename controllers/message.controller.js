@@ -130,7 +130,7 @@ exports.getMessages = async (req, res) => {
     try {
         const { id: receiverId } = req.params;
         const senderId = req.user.id;
-        const { limit = 50, before } = req.query;
+        const { limit = 5, before } = req.query;
 
         const conversation = await Conversation.findOne({
             participants: { $all: [senderId, receiverId] },
