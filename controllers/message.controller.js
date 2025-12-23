@@ -73,9 +73,14 @@ exports.sendMessage = async (req, res) => {
             const sender = await User.findById(senderId).select("name avatar");
             console.log("Preparing push notification for message from:", sender?.name);
 
+            // For encrypted messages, show generic text since server can't decrypt
+            const notificationBody = isEncrypted
+                ? "Sent you a message"
+                : (message.length > 50 ? message.substring(0, 50) + "..." : message);
+
             const pushPayload = {
-                title: `New Message from ${sender ? sender.name : 'Unknown'}`,
-                body: message.length > 50 ? message.substring(0, 50) + "..." : message,
+                title: sender ? sender.name : 'New Message',
+                body: notificationBody,
                 icon: sender?.avatar,
                 tag: 'message',
                 data: {
