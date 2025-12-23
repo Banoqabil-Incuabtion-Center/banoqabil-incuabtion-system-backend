@@ -99,6 +99,11 @@ const userSchema = new mongoose.Schema({
     leaves: { type: Number, default: 0 },
     totalHours: { type: Number, default: 0 }
   },
+  // E2E Encryption public key
+  publicKey: {
+    type: String,
+    default: null,
+  },
 });
 
 // Pre-save hook to generate incubation_id

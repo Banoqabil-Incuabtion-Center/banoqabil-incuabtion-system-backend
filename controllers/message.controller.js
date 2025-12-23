@@ -35,7 +35,7 @@ const { sendPushNotification } = require("./push.controller");
 
 exports.sendMessage = async (req, res) => {
     try {
-        const { message, receiverId } = req.body;
+        const { message, receiverId, iv, isEncrypted } = req.body;
         const senderId = req.user.id;
         const senderName = req.user.name; // Assuming user middleware populates name, or need to fetch
 
@@ -53,6 +53,8 @@ exports.sendMessage = async (req, res) => {
             conversationId: conversation._id,
             sender: senderId,
             text: message,
+            iv: iv || null,
+            isEncrypted: isEncrypted || false,
         });
 
         await newMessage.save();
@@ -193,6 +195,30 @@ exports.getUnreadCount = async (req, res) => {
         res.status(200).json({ unreadCount });
     } catch (error) {
         console.error("Error in getUnreadCount:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+};
+
+// E2E Encryption: Get user's public key
+exports.getUserPublicKey = async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const user = await User.findById(userId).select('publicKey');
+        res.status(200).json({ publicKey: user?.publicKey || null });
+    } catch (error) {
+        console.error("Error in getUserPublicKey:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+};
+
+// E2E Encryption: Update current user's public key
+exports.updatePublicKey = async (req, res) => {
+    try {
+        const { publicKey } = req.body;
+        await User.findByIdAndUpdate(req.user.id, { publicKey });
+        res.status(200).json({ success: true });
+    } catch (error) {
+        console.error("Error in updatePublicKey:", error);
         res.status(500).json({ error: "Internal server error" });
     }
 };

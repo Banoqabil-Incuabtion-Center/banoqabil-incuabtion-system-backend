@@ -16,6 +16,15 @@ const messageSchema = new mongoose.Schema(
             type: String,
             required: true,
         },
+        // E2E Encryption fields
+        iv: {
+            type: String,
+            default: null,
+        },
+        isEncrypted: {
+            type: Boolean,
+            default: false,
+        },
         seenBy: [
             {
                 type: mongoose.Schema.Types.ObjectId,
