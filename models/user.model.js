@@ -99,8 +99,20 @@ const userSchema = new mongoose.Schema({
     leaves: { type: Number, default: 0 },
     totalHours: { type: Number, default: 0 }
   },
-  // E2E Encryption public key
+  // E2E Encryption fields
   publicKey: {
+    type: String,
+    default: null,
+  },
+  encryptedPrivateKey: {
+    type: String,
+    default: null,
+  },
+  privateKeyIv: {
+    type: String,
+    default: null,
+  },
+  privateKeySalt: {
     type: String,
     default: null,
   },

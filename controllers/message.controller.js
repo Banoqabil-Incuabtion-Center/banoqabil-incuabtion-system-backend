@@ -204,11 +204,35 @@ exports.getUnreadCount = async (req, res) => {
     }
 };
 
-// E2E Encryption: Get user's public key
+// E2E Encryption: Get user's public key (and your own backup)
 exports.getUserPublicKey = async (req, res) => {
     try {
         const { userId } = req.params;
-        const user = await User.findById(userId).select('publicKey');
+        const currentUserId = req.user.id;
+
+        // If asking for own ID, also return backup info
+        const isOwn = userId.toString() === currentUserId.toString();
+
+        console.log('🔐 E2E Debug: Fetching public key for', { userId, currentUserId, isOwn });
+
+        const selectFields = isOwn
+            ? 'publicKey encryptedPrivateKey privateKeyIv privateKeySalt'
+            : 'publicKey';
+
+        const user = await User.findById(userId).select(selectFields);
+
+        if (isOwn) {
+            console.log('🔐 E2E Debug: Returning backup for owner');
+            return res.status(200).json({
+                publicKey: user?.publicKey || null,
+                backup: {
+                    encryptedPrivateKey: user?.encryptedPrivateKey || null,
+                    iv: user?.privateKeyIv || null,
+                    salt: user?.privateKeySalt || null
+                }
+            });
+        }
+
         res.status(200).json({ publicKey: user?.publicKey || null });
     } catch (error) {
         console.error("Error in getUserPublicKey:", error);
@@ -216,11 +240,30 @@ exports.getUserPublicKey = async (req, res) => {
     }
 };
 
-// E2E Encryption: Update current user's public key
+// E2E Encryption: Update current user's public key and private key backup
 exports.updatePublicKey = async (req, res) => {
     try {
-        const { publicKey } = req.body;
-        await User.findByIdAndUpdate(req.user.id, { publicKey });
+        const { publicKey, backup } = req.body;
+        console.log('🔐 E2E Debug: Updating key/backup for', req.user.id, { hasBackup: !!backup });
+
+        const updateData = { publicKey };
+
+        if (backup) {
+            updateData.encryptedPrivateKey = backup.encryptedPrivateKey;
+            updateData.privateKeyIv = backup.iv;
+            updateData.privateKeySalt = backup.salt;
+        }
+
+        const user = await User.findByIdAndUpdate(req.user.id, updateData, { new: true });
+        if (!user) {
+            console.error('❌ E2E Debug: User not found for update', req.user.id);
+            return res.status(404).json({ error: "User not found" });
+        }
+
+        console.log('✅ E2E Debug: Update successful', {
+            hasPublicKey: !!user.publicKey,
+            hasBackup: !!user.encryptedPrivateKey
+        });
         res.status(200).json({ success: true });
     } catch (error) {
         console.error("Error in updatePublicKey:", error);
