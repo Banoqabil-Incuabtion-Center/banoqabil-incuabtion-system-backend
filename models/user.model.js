@@ -53,7 +53,6 @@ const userSchema = new mongoose.Schema({
       "Idarah Noor e Haq",
       "Jamia Millia",
     ],
-    required: true,
   },
   course: {
     type: String,

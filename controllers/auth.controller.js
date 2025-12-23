@@ -334,7 +334,7 @@ authController.getUserById = async (req, res, next) => {
       return res.status(400).json({ error: "Invalid User ID" });
     }
 
-    const user = await userModel.findById(id).select('name avatar bq_id email incubation_id shift course gender bio status cardSettings');
+    const user = await userModel.findById(id).select('name avatar bq_id email incubation_id shift course gender bio status location cardSettings');
 
     if (!user) {
       return res.status(404).json({ error: "User not found" });
@@ -462,7 +462,7 @@ authController.getActiveUsers = async (req, res, next) => {
     const activeUserIds = Array.from(activeUsers.keys());
     const users = await userModel.find({
       _id: { $in: activeUserIds }
-    }).select('name email bq_id avatar cardSettings');
+    }).select('name email bq_id avatar location shift cardSettings');
 
     const result = users.map(user => {
       const activityData = activeUsers.get(user._id.toString());
