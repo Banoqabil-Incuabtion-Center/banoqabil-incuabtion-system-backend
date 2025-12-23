@@ -462,7 +462,7 @@ authController.getActiveUsers = async (req, res, next) => {
     const activeUserIds = Array.from(activeUsers.keys());
     const users = await userModel.find({
       _id: { $in: activeUserIds }
-    }).select('name email bq_id avatar location bio status shift cardSettings');
+    }).select('name email incubation_id bq_id avatar location bio status shift cardSettings');
 
     const result = users.map(user => {
       const activityData = activeUsers.get(user._id.toString());
