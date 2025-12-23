@@ -44,6 +44,17 @@ const userSchema = new mongoose.Schema({
     type: [Number], // 0=Sun, 1=Mon, ..., 6=Sat
     default: null,  // If null, use shift default
   },
+  location: {
+    type: String,
+    enum: [
+      "Bahadurabad",
+      "Expo (Fossphorus)",
+      "Clifton",
+      "Idarah Noor e Haq",
+      "Jamia Millia",
+    ],
+    required: true,
+  },
   course: {
     type: String,
     enum: [

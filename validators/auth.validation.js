@@ -10,6 +10,7 @@ const registerSchema = z.object({
   course: z.string().min(1, 'Course is required'),
   gender: z.string().min(1, 'Gender is required'),
   shift: z.string().min(1, 'Shift is required'),
+  location: z.string().min(1, 'Location is required'),
   termsAccepted: z.boolean().refine(val => val === true, {
     message: "You must accept the terms and conditions"
   }),

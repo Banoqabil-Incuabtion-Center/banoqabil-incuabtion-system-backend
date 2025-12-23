@@ -44,7 +44,7 @@ const logActivity = async (userId, action, req, sessionId = null) => {
 // ✅ Signup - Create new user
 authController.signupPost = async (req, res, next) => {
   try {
-    const { bq_id, name, email, password, phone, CNIC, course, gender, shift, dob, termsAccepted } = req.validatedData;
+    const { bq_id, name, email, password, phone, CNIC, course, gender, shift, location, dob, termsAccepted } = req.validatedData;
 
     const existingbq_id = await userModel.findOne({ bq_id });
     if (existingbq_id) {
@@ -94,6 +94,7 @@ authController.signupPost = async (req, res, next) => {
       course,
       gender,
       shift,
+      location,
       dob,
       termsAccepted
     });
@@ -110,11 +111,13 @@ authController.getenums = async (req, res, next) => {
     const courseOptions = userModel.schema.path("course").enumValues;
     const genderOptions = userModel.schema.path("gender").enumValues;
     const shiftOptions = userModel.schema.path("shift").enumValues;
+    const locationOptions = userModel.schema.path("location").enumValues;
 
     return res.status(200).json({
       courses: courseOptions,
       genders: genderOptions,
-      shifts: shiftOptions
+      shifts: shiftOptions,
+      locations: locationOptions
     });
   } catch (error) {
     next(error);
@@ -246,6 +249,7 @@ authController.loginPost = async (req, res, next) => {
         phone: user.phone,
         course: user.course,
         shift: user.shift,
+        location: user.location,
         workingDays: user.workingDays,
         avatar: user.avatar,
         bio: user.bio,
@@ -527,7 +531,7 @@ authController.updateUser = async (req, res, next) => {
     }
 
     const updateData = {};
-    const fields = ['bq_id', 'name', 'bio', 'status', 'email', 'phone', 'CNIC', 'course', 'gender', 'shift', 'cardSettings'];
+    const fields = ['bq_id', 'name', 'bio', 'status', 'email', 'phone', 'CNIC', 'course', 'gender', 'shift', 'location', 'cardSettings'];
     fields.forEach(field => {
       if (req.validatedData[field] !== undefined) {
         updateData[field] = req.validatedData[field];
