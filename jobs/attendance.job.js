@@ -14,8 +14,27 @@ const markAbsentJob = async (options = {}) => {
         // Target Date: Yesterday (since this job now runs at 00:30 AM the next day)
         const now = moment().tz(timezone);
         const targetDate = now.clone().subtract(1, 'days');
+        const targetDateString = targetDate.format("YYYY-MM-DD");
 
-        console.log(`Checking attendance for: ${targetDate.format("YYYY-MM-DD")}`);
+        // 🔒 Locking Mechanism: Atomic check to ensure job runs only once per target date (skip for dry runs)
+        if (!dryRun) {
+            const lockAcquired = await AttendanceSettings.findOneAndUpdate(
+                {
+                    _id: settings._id,
+                    lastAutomatedRunDate: { $ne: targetDateString } // Only proceed if NOT already executed for this date
+                },
+                {
+                    $set: { lastAutomatedRunDate: targetDateString }
+                }
+            );
+
+            if (!lockAcquired) {
+                console.log(`⚠️ Attendance Job already ran for ${targetDateString}. Skipping to prevent duplicates.`);
+                return { success: true, message: "Job already executed for this date.", skipped: true };
+            }
+        }
+
+        console.log(`Checking attendance for: ${targetDateString}`);
 
         const targetDay = targetDate.day(); // 0=Sun, 1=Mon...
 

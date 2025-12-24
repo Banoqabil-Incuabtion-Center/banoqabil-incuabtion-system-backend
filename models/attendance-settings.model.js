@@ -36,6 +36,9 @@ const AttendanceSettingsSchema = mongoose.Schema({
     // Auto-actions
     autoMarkAbsentTime: { type: Number, default: null }, // Hour to mark absent if no check-in (null = disabled)
 
+    // Cron Job Locking
+    lastAutomatedRunDate: { type: String, default: null }, // Format: YYYY-MM-DD
+
     isActive: { type: Boolean, default: true }
 }, {
     timestamps: true,
