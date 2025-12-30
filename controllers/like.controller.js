@@ -239,33 +239,28 @@ likeController.toggleCommentLike = async (req, res) => {
     }
 };
 
+const paginate = require("../utils/paginate.util");
+
 // Get all likes for a post with pagination
 likeController.getLikesByPost = async (req, res) => {
     try {
         const { postId } = req.params;
-        console.log("🔍 getLikesByPost called for:", postId);
-
         const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 20;
-        const skip = (page - 1) * limit;
+        const limit = parseInt(req.query.limit) || 10;
 
         // Check if post exists in either model
         const post = await findPost(postId);
         if (!post) {
-            console.log("❌ Post not found:", postId);
             return res.status(404).json({ error: "Post not found" });
         }
 
-        // Get likes with pagination
-        const likes = await likeModel
-            .find({ post: postId })
-            .populate("user", "name email")
-            .sort({ createdAt: -1 })
-            .skip(skip)
-            .limit(limit);
-
-        // Get total count
-        const totalLikes = await likeModel.countDocuments({ post: postId });
+        const result = await paginate({
+            model: likeModel,
+            page,
+            limit,
+            query: { post: postId },
+            populate: { path: "user", select: "name email avatar" }
+        });
 
         // Check if current user liked the post
         const userLiked = req.user
@@ -273,15 +268,7 @@ likeController.getLikesByPost = async (req, res) => {
             : false;
 
         return res.status(200).json({
-            data: likes,
-            pagination: {
-                currentPage: page,
-                totalPages: Math.ceil(totalLikes / limit),
-                totalItems: totalLikes,
-                itemsPerPage: limit,
-                hasNextPage: page * limit < totalLikes,
-                hasPrevPage: page > 1,
-            },
+            ...result,
             userLiked: !!userLiked,
         });
     } catch (error) {
@@ -297,11 +284,8 @@ likeController.getLikesByPost = async (req, res) => {
 likeController.getCommentLikes = async (req, res) => {
     try {
         const { commentId } = req.params;
-        console.log("🔍 getCommentLikes called for:", commentId);
-
         const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 20;
-        const skip = (page - 1) * limit;
+        const limit = parseInt(req.query.limit) || 10;
 
         // Check if comment exists
         const comment = await commentModel.findById(commentId);
@@ -309,16 +293,13 @@ likeController.getCommentLikes = async (req, res) => {
             return res.status(404).json({ error: "Comment not found" });
         }
 
-        // Get likes with pagination
-        const likes = await likeModel
-            .find({ comment: commentId })
-            .populate("user", "name email")
-            .sort({ createdAt: -1 })
-            .skip(skip)
-            .limit(limit);
-
-        // Get total count
-        const totalLikes = await likeModel.countDocuments({ comment: commentId });
+        const result = await paginate({
+            model: likeModel,
+            page,
+            limit,
+            query: { comment: commentId },
+            populate: { path: "user", select: "name email avatar" }
+        });
 
         // Check if current user liked the comment
         const userLiked = req.user
@@ -326,15 +307,7 @@ likeController.getCommentLikes = async (req, res) => {
             : false;
 
         return res.status(200).json({
-            data: likes,
-            pagination: {
-                currentPage: page,
-                totalPages: Math.ceil(totalLikes / limit),
-                totalItems: totalLikes,
-                itemsPerPage: limit,
-                hasNextPage: page * limit < totalLikes,
-                hasPrevPage: page > 1,
-            },
+            ...result,
             userLiked: !!userLiked,
         });
     } catch (error) {
