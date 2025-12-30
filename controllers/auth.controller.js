@@ -172,36 +172,27 @@ authController.loginPost = async (req, res, next) => {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-      maxAge: 24 * 60 * 60 * 1000
+      maxAge: 24 * 60 * 60 * 1000 // 1 day
     };
 
-    let refreshToken = null;
+    // Always generate and set refresh token (Default Remember Me)
+    const refreshToken = crypto.randomBytes(40).toString('hex');
+    const hashedRefreshToken = crypto
+      .createHash('sha256')
+      .update(refreshToken)
+      .digest('hex');
 
-    if (req.body.remember) {
-      refreshToken = crypto.randomBytes(40).toString('hex');
+    user.refreshToken = hashedRefreshToken;
+    await user.save();
 
-      const hashedRefreshToken = crypto
-        .createHash('sha256')
-        .update(refreshToken)
-        .digest('hex');
+    const refreshCookieOptions = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
+    };
 
-      user.refreshToken = hashedRefreshToken;
-      await user.save();
-
-      const refreshCookieOptions = {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-        maxAge: 30 * 24 * 60 * 60 * 1000
-      };
-
-      res.cookie("refreshToken", refreshToken, refreshCookieOptions);
-    } else {
-      user.refreshToken = undefined;
-      await user.save();
-      res.clearCookie("refreshToken");
-    }
-
+    res.cookie("refreshToken", refreshToken, refreshCookieOptions);
     res.cookie("token", accessToken, accessTokenCookieOptions);
 
     // 🔥 LOG LOGIN ACTIVITY & GET DEVICE INFO
@@ -271,8 +262,10 @@ authController.loginPost = async (req, res, next) => {
 authController.refreshAccessToken = async (req, res, next) => {
   try {
     const refreshToken = req.cookies.refreshToken;
+    console.log("🔄 Token refresh attempt. Cookies present:", !!req.cookies);
 
     if (!refreshToken) {
+      console.log("❌ Refresh failed: No refresh token in cookies");
       return res.status(401).json({ message: "No refresh token provided" });
     }
 
@@ -285,8 +278,11 @@ authController.refreshAccessToken = async (req, res, next) => {
     const user = await userModel.findOne({ refreshToken: hashedRefreshToken, deletedAt: null });
 
     if (!user) {
+      console.log("❌ Refresh failed: Invalid/Hashed token match not found in DB");
       return res.status(403).json({ message: "Invalid refresh token" });
     }
+
+    console.log(`✅ Refresh successful for user: ${user.email}`);
 
     const accessToken = UsertokenGenerator(user);
 
@@ -294,7 +290,7 @@ authController.refreshAccessToken = async (req, res, next) => {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-      maxAge: 24 * 60 * 60 * 1000
+      maxAge: 24 * 60 * 60 * 1000 // Match login maxAge
     };
 
     res.cookie("token", accessToken, cookieOptions);
