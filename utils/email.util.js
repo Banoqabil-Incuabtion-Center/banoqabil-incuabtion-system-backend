@@ -40,8 +40,8 @@ const transporter = createTransporter();
  */
 const sendPasswordResetEmail = async (email, resetToken, userName = 'User') => {
     // 🔗 Priority: USER_URL (frontend) > FRONTEND_URL > BACKEND_URL (fallback)
-    const frontendUrl = process.env.USER_URL || process.env.FRONTEND_URL;
-    const resetUrl = `${frontendUrl.replace(/\/$/, '')}/reset-password/${resetToken}`;
+    const frontendUrl = process.env.USER_URL || process.env.FRONTEND_URL || 'https://banoqabil-incubatees.vercel.app';
+    const resetUrl = `${(frontendUrl || '').replace(/\/$/, '')}/reset-password/${resetToken}`;
 
     const mailOptions = {
         from: `"BQ Incubation" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
