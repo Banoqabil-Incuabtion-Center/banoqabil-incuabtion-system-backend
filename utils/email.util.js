@@ -28,7 +28,7 @@ const createTransporter = () => {
         socketTimeout: 20000,
     };
 
-    // 🚀 Gmail specific refinement: Use service property for more reliable connection
+    // Gmail specific refinement: Use service property for more reliable connection
     if (host.includes('gmail.com')) {
         delete config.host;
         delete config.port;
@@ -49,13 +49,8 @@ const transporter = createTransporter();
  */
 const sendPasswordResetEmail = async (email, resetToken, userName = 'User') => {
     // 🔗 Priority: USER_URL (frontend) > FRONTEND_URL > BACKEND_URL (fallback)
-    const frontendUrl = process.env.USER_URL || process.env.FRONTEND_URL || 'https://banoqabil-incubatees.vercel.app';
-    const resetUrl = `${frontendUrl.replace(/\/$/, '')}/reset-password/${resetToken}`;
-
-    console.log('🔗 Reset Password URL parameters:', {
-        frontendUrl: frontendUrl,
-        finalUrl: resetUrl.split('/reset-password/')[0] + '/reset-password/...'
-    });
+    const frontendUrl = process.env.USER_URL || process.env.FRONTEND_URL || process.env.LOCAL_URL || 'https://banoqabil-incubatees.vercel.app';
+    const resetUrl = `${(frontendUrl || '').replace(/\/$/, '')}/reset-password/${resetToken}`;
 
     const mailOptions = {
         from: `"BQ Incubation" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
