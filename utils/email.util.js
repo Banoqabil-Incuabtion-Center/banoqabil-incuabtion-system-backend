@@ -39,7 +39,7 @@ const transporter = createTransporter();
  * @param {string} userName - User's name for personalization
  */
 const sendPasswordResetEmail = async (email, resetToken, userName = 'User') => {
-    const resetUrl = `${process.env.USER_URL || process.env.LOCAL_URL}/reset-password/${resetToken}`;
+    const resetUrl = `${process.env.BACKEND_URL || 'http://localhost:5173'}/reset-password/${resetToken}`;
 
     const mailOptions = {
         from: `"BQ Incubation" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
