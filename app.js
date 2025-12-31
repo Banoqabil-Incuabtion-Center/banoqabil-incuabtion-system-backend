@@ -46,6 +46,7 @@ app.use(
       process.env.USER_URL,
       process.env.LOCAL_URL,
       "https://ims-frontend-admin.vercel.app",
+      "https://banoqabil-incubatees.vercel.app",
     ].filter(Boolean).map(url => url.replace(/\/$/, "")),
     credentials: true,
   })
