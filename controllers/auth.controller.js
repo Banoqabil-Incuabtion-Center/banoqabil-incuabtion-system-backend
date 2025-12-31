@@ -622,4 +622,126 @@ authController.updateAvatar = async (req, res) => {
   }
 };
 
+// ✅ Forgot Password - Send reset email
+authController.forgotPassword = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+
+    const emailLower = email.toLowerCase();
+    const user = await userModel.findOne({ email: emailLower, deletedAt: null });
+
+    // Always return success to prevent email enumeration attacks
+    if (!user) {
+      return res.status(200).json({
+        message: "If an account with that email exists, a password reset link has been sent."
+      });
+    }
+
+    // Generate cryptographically secure token
+    const crypto = require('crypto');
+    const resetToken = crypto.randomBytes(32).toString('hex');
+
+    // Hash token before storing in database (security best practice)
+    const hashedToken = crypto
+      .createHash('sha256')
+      .update(resetToken)
+      .digest('hex');
+
+    // Set token and expiry (30 minutes)
+    user.resetPasswordToken = hashedToken;
+    user.resetPasswordExpires = Date.now() + 30 * 60 * 1000; // 30 minutes
+    await user.save();
+
+    // Send email with the plain token (not hashed)
+    try {
+      const { sendPasswordResetEmail } = require('../utils/email.util');
+      await sendPasswordResetEmail(user.email, resetToken, user.name);
+
+      console.log(`📧 Password reset email sent to ${user.email}`);
+    } catch (emailError) {
+      console.error('❌ Failed to send reset email:', emailError);
+      // Clear token if email fails
+      user.resetPasswordToken = null;
+      user.resetPasswordExpires = null;
+      await user.save();
+
+      return res.status(500).json({
+        message: "Failed to send reset email. Please try again later."
+      });
+    }
+
+    res.status(200).json({
+      message: "If an account with that email exists, a password reset link has been sent."
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ✅ Reset Password - Set new password with token
+authController.resetPassword = async (req, res, next) => {
+  try {
+    const { token } = req.params;
+    const { password, confirmPassword } = req.body;
+
+    if (!token) {
+      return res.status(400).json({ message: "Reset token is required" });
+    }
+
+    if (!password || !confirmPassword) {
+      return res.status(400).json({ message: "Password and confirmation are required" });
+    }
+
+    if (password !== confirmPassword) {
+      return res.status(400).json({ message: "Passwords do not match" });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({ message: "Password must be at least 6 characters" });
+    }
+
+    // Hash the incoming token to compare with stored hash
+    const crypto = require('crypto');
+    const hashedToken = crypto
+      .createHash('sha256')
+      .update(token)
+      .digest('hex');
+
+    // Find user with valid token that hasn't expired
+    const user = await userModel.findOne({
+      resetPasswordToken: hashedToken,
+      resetPasswordExpires: { $gt: Date.now() },
+      deletedAt: null
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        message: "Password reset link is invalid or has expired"
+      });
+    }
+
+    // Hash new password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    // Update password and clear reset token
+    user.password = hashedPassword;
+    user.resetPasswordToken = null;
+    user.resetPasswordExpires = null;
+    await user.save();
+
+    console.log(`✅ Password reset successful for ${user.email}`);
+
+    res.status(200).json({
+      message: "Password has been reset successfully. You can now login with your new password."
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = authController;

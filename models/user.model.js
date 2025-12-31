@@ -126,6 +126,15 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: null,
   },
+  // Password Reset fields
+  resetPasswordToken: {
+    type: String,
+    default: null,
+  },
+  resetPasswordExpires: {
+    type: Date,
+    default: null,
+  },
 });
 
 // Pre-save hook to generate incubation_id
