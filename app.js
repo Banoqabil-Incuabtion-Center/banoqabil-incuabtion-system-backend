@@ -28,6 +28,7 @@ require("./config/db.config")();
 const { initAttendanceJobs } = require("./jobs/attendance.job");
 initAttendanceJobs(); // Start the cron job
 
+// Brain of the app
 const app = express();
 
 // Create HTTP server
@@ -37,17 +38,29 @@ const server = http.createServer(app);
 const io = initializeSocket(server);
 console.log("✅ Socket.IO initialized");
 
+// 1. CORS - MUST be first to handle preflights correctly
 app.use(
   cors({
     origin: [
       process.env.ADMIN_URL,
       process.env.USER_URL,
       process.env.LOCAL_URL,
+      "https://banoqabil-incubatees.vercel.app",
       "https://ims-frontend-admin.vercel.app",
-    ].filter(Boolean),
+    ].filter(Boolean).map(url => url.replace(/\/$/, "")),
     credentials: true,
   })
 );
+
+// 2. Health Check (before other middlewares)
+app.get("/api/health", (req, res) => {
+  res.status(200).json({
+    status: "ok",
+    timestamp: new Date(),
+    env: process.env.NODE_ENV,
+    smtpConfigured: !!(process.env.SMTP_USER && process.env.SMTP_PASS)
+  });
+});
 
 app.use(express.json());
 app.use(cookieParser());

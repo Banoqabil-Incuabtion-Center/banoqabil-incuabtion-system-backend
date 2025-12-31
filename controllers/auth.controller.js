@@ -5,6 +5,7 @@ const { UsertokenGenerator } = require("../utils/token.util");
 const paginate = require("../utils/paginate.util");
 const mongoose = require("mongoose");
 const { parseUserAgent, getClientIP, getLocationFromIP } = require("../utils/deviceDetector.util");
+const { sendPasswordResetEmail, isSmtpConfigured } = require("../utils/email.util");
 
 const authController = {};
 

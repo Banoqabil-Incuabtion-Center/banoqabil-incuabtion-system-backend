@@ -59,9 +59,10 @@ const errorMiddleware = async (err, req, res, next) => {
             ip: req.ip,
         };
 
-        // Log to console in dev
+        // Log to console for production debugging (e.g., Render/Vercel logs)
+        console.error(`❌ Error [${req.method} ${req.url}]:`, err.message || err);
         if (process.env.NODE_ENV !== "production") {
-            console.error("❌ Error caught by middleware:", err);
+            console.error(err.stack);
         }
 
         // Save to MongoDB
