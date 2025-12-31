@@ -33,6 +33,12 @@ const createTransporter = () => {
     // via environment variables.
 
 
+    console.log('📧 SMTP Config:', {
+        host: config.host,
+        port: config.port,
+        secure: config.secure,
+    });
+
     return nodemailer.createTransport(config);
 };
 
