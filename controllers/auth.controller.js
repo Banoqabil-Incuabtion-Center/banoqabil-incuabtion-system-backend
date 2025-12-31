@@ -658,19 +658,27 @@ authController.forgotPassword = async (req, res, next) => {
 
     // Send email with the plain token (not hashed)
     try {
-      const { sendPasswordResetEmail } = require('../utils/email.util');
-      await sendPasswordResetEmail(user.email, resetToken, user.name);
+      const { sendPasswordResetEmail, isSmtpConfigured } = require('../utils/email.util');
 
-      console.log(`📧 Password reset email sent to ${user.email}`);
+      if (!isSmtpConfigured || !isSmtpConfigured()) {
+        console.error('❌ SMTP not configured in environment variables');
+        return res.status(503).json({
+          message: "Email service is currently unavailable. Please contact administrator to setup SMTP credentials."
+        });
+      }
+
+      await sendPasswordResetEmail(user.email, resetToken, user.name);
+      console.log(`✅ Password reset email sent successfully to ${user.email}`);
     } catch (emailError) {
-      console.error('❌ Failed to send reset email:', emailError);
+      console.error('❌ Failed to send reset email Error:', emailError.message || emailError);
+
       // Clear token if email fails
       user.resetPasswordToken = null;
       user.resetPasswordExpires = null;
       await user.save();
 
       return res.status(500).json({
-        message: "Failed to send reset email. Please try again later."
+        message: `Failed to send email: ${emailError.message || 'Unknown SMTP error'}. Please try again later.`
       });
     }
 
