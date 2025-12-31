@@ -1,15 +1,33 @@
 const nodemailer = require('nodemailer');
 
+// Check if SMTP is configured
+const isSmtpConfigured = () => {
+    return !!(process.env.SMTP_USER && process.env.SMTP_PASS);
+};
+
 // Create reusable transporter object using SMTP
-const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port: parseInt(process.env.SMTP_PORT) || 587,
-    secure: false, // true for 465, false for other ports
-    auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-    },
-});
+const createTransporter = () => {
+    if (!isSmtpConfigured()) {
+        console.warn('⚠️ SMTP credentials not configured. Email sending will fail.');
+        return null;
+    }
+
+    return nodemailer.createTransport({
+        host: process.env.SMTP_HOST || 'smtp.gmail.com',
+        port: parseInt(process.env.SMTP_PORT) || 587,
+        secure: false, // true for 465, false for other ports
+        auth: {
+            user: process.env.SMTP_USER,
+            pass: process.env.SMTP_PASS,
+        },
+        // Timeout settings to prevent hanging
+        connectionTimeout: 10000, // 10 seconds
+        greetingTimeout: 10000,
+        socketTimeout: 15000,
+    });
+};
+
+const transporter = createTransporter();
 
 /**
  * Send password reset email
@@ -77,13 +95,19 @@ const sendPasswordResetEmail = async (email, resetToken, userName = 'User') => {
         text: `Hi ${userName},\n\nWe received a request to reset your password.\n\nClick the link below to reset your password:\n${resetUrl}\n\nThis link will expire in 30 minutes.\n\nIf you didn't request this, please ignore this email.\n\n© ${new Date().getFullYear()} BQ Incubation`,
     };
 
+    // Check if transporter is available
+    if (!transporter) {
+        console.error('❌ Email sending failed: SMTP not configured');
+        throw new Error('Email service not configured. Please contact administrator.');
+    }
+
     try {
         const info = await transporter.sendMail(mailOptions);
         console.log('📧 Password reset email sent:', info.messageId);
         return { success: true, messageId: info.messageId };
     } catch (error) {
-        console.error('❌ Email sending failed:', error);
-        throw error;
+        console.error('❌ Email sending failed:', error.message || error);
+        throw new Error('Failed to send email. Please try again later.');
     }
 };
 
@@ -91,12 +115,17 @@ const sendPasswordResetEmail = async (email, resetToken, userName = 'User') => {
  * Verify transporter connection
  */
 const verifyEmailConnection = async () => {
+    if (!transporter) {
+        console.error('❌ Email server not configured: SMTP credentials missing');
+        return false;
+    }
+
     try {
         await transporter.verify();
         console.log('✅ Email server is ready');
         return true;
     } catch (error) {
-        console.error('❌ Email server connection failed:', error);
+        console.error('❌ Email server connection failed:', error.message || error);
         return false;
     }
 };
@@ -104,5 +133,6 @@ const verifyEmailConnection = async () => {
 module.exports = {
     sendPasswordResetEmail,
     verifyEmailConnection,
+    isSmtpConfigured,
     transporter,
 };
