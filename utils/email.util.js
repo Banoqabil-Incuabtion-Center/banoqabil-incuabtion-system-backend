@@ -23,29 +23,18 @@ const createTransporter = () => {
             user: process.env.SMTP_USER,
             pass: process.env.SMTP_PASS,
         },
-        tls: {
-            rejectUnauthorized: false,
-            ciphers: 'SSLv3'
-        },
-        connectionTimeout: 60000,
-        greetingTimeout: 60000,
-        socketTimeout: 60000,
-        // Force IPv4 (Fixes common Cloud/Gmail IPv6 timeouts)
-        family: 4,
-        debug: true, // Show basic debug info
-        logger: true // Log to console
+        connectionTimeout: 15000,
+        greetingTimeout: 15000,
+        socketTimeout: 20000,
     };
 
-    // ALLOW CUSTOM GMAIL PORT (Fix for Render/Cloud Timeout Issues)
-    // We do NOT use 'service: gmail' here so we can explicitly control the port (465 vs 587)
-    // via environment variables.
-
-
-    console.log('📧 SMTP Config:', {
-        host: config.host,
-        port: config.port,
-        secure: config.secure,
-    });
+    // 🚀 Gmail specific refinement: Use service property for more reliable connection
+    if (host.includes('gmail.com')) {
+        delete config.host;
+        delete config.port;
+        delete config.secure;
+        config.service = 'gmail';
+    }
 
     return nodemailer.createTransport(config);
 };
@@ -59,7 +48,8 @@ const transporter = createTransporter();
  * @param {string} userName - User's name for personalization
  */
 const sendPasswordResetEmail = async (email, resetToken, userName = 'User') => {
-    const frontendUrl = process.env.USER_URL || process.env.LOCAL_URL || 'https://banoqabil-incubatees.vercel.app';
+    // 🔗 Priority: USER_URL (frontend) > FRONTEND_URL > BACKEND_URL (fallback)
+    const frontendUrl = process.env.USER_URL || 'https://banoqabil-incubatees.vercel.app';
     const resetUrl = `${(frontendUrl || '').replace(/\/$/, '')}/reset-password/${resetToken}`;
 
     const mailOptions = {
