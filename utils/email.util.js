@@ -15,7 +15,7 @@ const createTransporter = () => {
     const host = process.env.SMTP_HOST || 'smtp.gmail.com';
     const port = parseInt(process.env.SMTP_PORT) || 587;
 
-    return nodemailer.createTransport({
+    const config = {
         host: host,
         port: port,
         secure: port === 465, // true for 465, false for other ports
@@ -23,11 +23,20 @@ const createTransporter = () => {
             user: process.env.SMTP_USER,
             pass: process.env.SMTP_PASS,
         },
-        // Timeout settings to prevent hanging
-        connectionTimeout: 15000, // 15 seconds
+        connectionTimeout: 15000,
         greetingTimeout: 15000,
         socketTimeout: 20000,
-    });
+    };
+
+    // 🚀 Gmail specific refinement: Use service property for more reliable connection
+    if (host.includes('gmail.com')) {
+        delete config.host;
+        delete config.port;
+        delete config.secure;
+        config.service = 'gmail';
+    }
+
+    return nodemailer.createTransport(config);
 };
 
 const transporter = createTransporter();
