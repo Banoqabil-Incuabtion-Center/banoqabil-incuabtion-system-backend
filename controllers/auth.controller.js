@@ -670,9 +670,8 @@ authController.forgotPassword = async (req, res, next) => {
     // Send email with the plain token (not hashed)
     try {
       console.log('📧 Preparing to send email...');
-      const { sendPasswordResetEmail, isSmtpConfigured } = require('../utils/email.util');
 
-      if (!isSmtpConfigured || !isSmtpConfigured()) {
+      if (!isSmtpConfigured()) {
         console.error('❌ SMTP not configured in environment variables');
         return res.status(503).json({
           message: "Email service is currently unavailable. Please contact administrator to setup SMTP credentials."
