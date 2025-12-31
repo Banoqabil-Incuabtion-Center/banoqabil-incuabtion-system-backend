@@ -41,13 +41,25 @@ console.log("✅ Socket.IO initialized");
 // 1. CORS - MUST be first to handle preflights correctly
 app.use(
   cors({
-    origin: [
-      process.env.ADMIN_URL,
-      process.env.USER_URL,
-      process.env.LOCAL_URL,
-      "https://ims-frontend-admin.vercel.app",
-      "https://banoqabil-incubatees.vercel.app",
-    ].filter(Boolean).map(url => url.replace(/\/$/, "")),
+    origin: (origin, callback) => {
+      const allowedOrigins = [
+        process.env.ADMIN_URL,
+        process.env.USER_URL,
+        process.env.LOCAL_URL,
+        "https://ims-frontend-admin.vercel.app",
+        "https://banoqabil-incubatees.vercel.app",
+      ].filter(Boolean).map(url => url.trim().replace(/\/$/, ""));
+
+      // Allow requests with no origin (like mobile apps or curl)
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== "production") {
+        callback(null, true);
+      } else {
+        console.warn(`⚠️ CORS blocked for origin: ${origin}`);
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     credentials: true,
   })
 );
