@@ -23,9 +23,9 @@ const createTransporter = () => {
             user: process.env.SMTP_USER,
             pass: process.env.SMTP_PASS,
         },
-        connectionTimeout: 15000,
-        greetingTimeout: 15000,
-        socketTimeout: 20000,
+        connectionTimeout: 60000, // Increased to 60s
+        greetingTimeout: 60000,
+        socketTimeout: 60000,
     };
 
     // ALLOW CUSTOM GMAIL PORT (Fix for Render/Cloud Timeout Issues)
