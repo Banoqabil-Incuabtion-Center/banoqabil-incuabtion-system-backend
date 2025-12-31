@@ -28,13 +28,10 @@ const createTransporter = () => {
         socketTimeout: 20000,
     };
 
-    // Gmail specific refinement: Use service property for more reliable connection
-    if (host.includes('gmail.com')) {
-        delete config.host;
-        delete config.port;
-        delete config.secure;
-        config.service = 'gmail';
-    }
+    // ALLOW CUSTOM GMAIL PORT (Fix for Render/Cloud Timeout Issues)
+    // We do NOT use 'service: gmail' here so we can explicitly control the port (465 vs 587)
+    // via environment variables.
+
 
     return nodemailer.createTransport(config);
 };
