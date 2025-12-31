@@ -136,6 +136,8 @@ userPostController.getUserPostsWithStats = async (req, res) => {
     const userId = req.query.userId; // Optional: filter by user
     const currentUserId = req.user.id; // Logged in user for like status
 
+    // console.log("👉 getUserPostsWithStats called. CurrentUser:", currentUserId);
+
     const skip = (page - 1) * limit;
 
     // Build match query
@@ -185,8 +187,6 @@ userPostController.getUserPostsWithStats = async (req, res) => {
         $addFields: {
           likeCount: { $size: '$likes' },
           commentCount: { $size: '$comments' },
-          likeCount: { $size: '$likes' },
-          commentCount: { $size: '$comments' },
           user: { $arrayElemAt: ['$userInfo', 0] },
           userLiked: {
             $in: [new mongoose.Types.ObjectId(currentUserId), '$likes.user']
@@ -203,7 +203,6 @@ userPostController.getUserPostsWithStats = async (req, res) => {
           image: 1,
           createdAt: 1,
           likeCount: 1,
-          likeCount: 1,
           commentCount: 1,
           userLiked: 1,
           'user._id': 1,
@@ -218,6 +217,8 @@ userPostController.getUserPostsWithStats = async (req, res) => {
     // Get total count for pagination
     const totalCount = await userPostModel.countDocuments(matchQuery);
     const totalPages = Math.ceil(totalCount / limit);
+
+    // console.log(`👉 Fetched ${posts.length} posts. First post liked? ${posts[0]?.userLiked}`);
 
     res.status(200).json({
       data: posts,
