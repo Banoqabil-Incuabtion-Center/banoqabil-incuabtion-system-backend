@@ -627,6 +627,7 @@ authController.updateAvatar = async (req, res) => {
 authController.forgotPassword = async (req, res, next) => {
   try {
     const { email } = req.body;
+    console.log(`🔍 Forgot password requested for: ${email}`);
 
     if (!email) {
       return res.status(400).json({ message: "Email is required" });
@@ -634,6 +635,7 @@ authController.forgotPassword = async (req, res, next) => {
 
     const emailLower = email.toLowerCase();
     const user = await userModel.findOne({ email: emailLower, deletedAt: null });
+    console.log(`👤 User lookup complete. Found: ${!!user}`);
 
     // Always return success to prevent email enumeration attacks
     if (!user) {
@@ -643,6 +645,7 @@ authController.forgotPassword = async (req, res, next) => {
     }
 
     // Generate cryptographically secure token
+    console.log('🎲 Generating reset token...');
     const crypto = require('crypto');
     const resetToken = crypto.randomBytes(32).toString('hex');
 
@@ -655,10 +658,14 @@ authController.forgotPassword = async (req, res, next) => {
     // Set token and expiry (30 minutes)
     user.resetPasswordToken = hashedToken;
     user.resetPasswordExpires = Date.now() + 30 * 60 * 1000; // 30 minutes
+
+    console.log('💾 Saving user with reset token...');
     await user.save();
+    console.log('✅ User saved successfully');
 
     // Send email with the plain token (not hashed)
     try {
+      console.log('📧 Preparing to send email...');
       const { sendPasswordResetEmail, isSmtpConfigured } = require('../utils/email.util');
 
       if (!isSmtpConfigured || !isSmtpConfigured()) {
@@ -687,6 +694,7 @@ authController.forgotPassword = async (req, res, next) => {
       message: "If an account with that email exists, a password reset link has been sent."
     });
   } catch (error) {
+    console.error('🔥 CRITICAL ERROR in forgotPassword:', error.message);
     next(error);
   }
 };

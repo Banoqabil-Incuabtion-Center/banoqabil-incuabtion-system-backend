@@ -52,7 +52,6 @@ app.use(
   })
 );
 
-// 2. Health Check (before other middlewares)
 app.get("/api/health", (req, res) => {
   res.status(200).json({
     status: "ok",
