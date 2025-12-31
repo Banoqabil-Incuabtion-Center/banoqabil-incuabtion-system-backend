@@ -23,9 +23,13 @@ const createTransporter = () => {
             user: process.env.SMTP_USER,
             pass: process.env.SMTP_PASS,
         },
-        connectionTimeout: 60000, // Increased to 60s
+        connectionTimeout: 60000,
         greetingTimeout: 60000,
         socketTimeout: 60000,
+        // Force IPv4 (Fixes common Cloud/Gmail IPv6 timeouts)
+        family: 4,
+        debug: true, // Show basic debug info
+        logger: true // Log to console
     };
 
     // ALLOW CUSTOM GMAIL PORT (Fix for Render/Cloud Timeout Issues)
