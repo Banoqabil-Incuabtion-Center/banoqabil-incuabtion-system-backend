@@ -656,12 +656,16 @@ authController.forgotPassword = async (req, res, next) => {
       .digest('hex');
 
     // Set token and expiry (30 minutes)
-    user.resetPasswordToken = hashedToken;
-    user.resetPasswordExpires = Date.now() + 30 * 60 * 1000; // 30 minutes
-
-    console.log('💾 Saving user with reset token...');
-    await user.save();
-    console.log('✅ User saved successfully');
+    console.log('💾 Updating user with reset token in database...');
+    const updatedUser = await userModel.findOneAndUpdate(
+      { _id: user._id },
+      {
+        resetPasswordToken: hashedToken,
+        resetPasswordExpires: Date.now() + 30 * 60 * 1000
+      },
+      { new: true, runValidators: false }
+    );
+    console.log('✅ User updated successfully in database');
 
     // Send email with the plain token (not hashed)
     try {
@@ -678,12 +682,19 @@ authController.forgotPassword = async (req, res, next) => {
       await sendPasswordResetEmail(user.email, resetToken, user.name);
       console.log(`✅ Password reset email sent successfully to ${user.email}`);
     } catch (emailError) {
-      console.error('❌ Failed to send reset email Error:', emailError.message || emailError);
+      console.error('❌ SMTP Error Detail:', emailError.message || emailError);
 
       // Clear token if email fails
-      user.resetPasswordToken = null;
-      user.resetPasswordExpires = null;
-      await user.save();
+      try {
+        await userModel.findOneAndUpdate(
+          { _id: user._id },
+          { resetPasswordToken: null, resetPasswordExpires: null },
+          { runValidators: false }
+        );
+        console.log('🧹 Cleanup: Reset token cleared after email failure');
+      } catch (cleanupError) {
+        console.error('⚠️ Cleanup failed:', cleanupError.message);
+      }
 
       return res.status(500).json({
         message: `Failed to send email: ${emailError.message || 'Unknown SMTP error'}. Please try again later.`

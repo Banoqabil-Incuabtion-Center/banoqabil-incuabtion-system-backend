@@ -38,19 +38,31 @@ const server = http.createServer(app);
 const io = initializeSocket(server);
 console.log("✅ Socket.IO initialized");
 
-// 1. CORS - MUST be first to handle preflights correctly
-app.use(
-  cors({
-    origin: [
-      process.env.ADMIN_URL,
-      process.env.USER_URL,
-      process.env.LOCAL_URL,
-      "https://banoqabil-incubatees.vercel.app",
-      "https://ims-frontend-admin.vercel.app",
-    ].filter(Boolean).map(url => url.replace(/\/$/, "")),
-    credentials: true,
-  })
-);
+// 1. CORS - Robust configuration for production and local development
+const allowedOrigins = [
+  process.env.ADMIN_URL,
+  process.env.USER_URL,
+  process.env.LOCAL_URL,
+  "https://banoqabil-incubatees.vercel.app",
+  "https://ims-frontend-admin.vercel.app"
+].filter(Boolean).map(url => url.trim().replace(/\/$/, ""));
+
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin.replace(/\/$/, "")) || origin.endsWith(".vercel.app")) {
+      callback(null, true);
+    } else {
+      console.warn("🚫 CORS Blocked origin:", origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+}));
+
+// Explicitly handle preflight requests
+app.options("*", cors());
 
 app.get("/api/health", (req, res) => {
   res.status(200).json({
