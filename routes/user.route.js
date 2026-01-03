@@ -22,6 +22,7 @@ router.post("/reset-password/:token", authController.resetPassword)
 router.put("/update/:_id", validate(updateRegisterSchema), authController.updateUser)
 router.delete("/delete/:_id", authController.deleteUser)
 router.get("/enums", authController.getenums)
+router.post("/test-email", authController.sendTestEmail)
 
 
 router.get('/activities', protect, authController.getActivities);

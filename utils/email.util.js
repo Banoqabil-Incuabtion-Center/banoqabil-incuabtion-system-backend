@@ -12,8 +12,8 @@ const createTransporter = () => {
         return null;
     }
 
-    // Default to Brevo/Sendinblue
-    const host = process.env.SMTP_HOST || 'smtp-relay.brevo.com';
+    // Default to Gmail if not specified
+    const host = process.env.SMTP_HOST || 'smtp.gmail.com';
     const port = parseInt(process.env.SMTP_PORT) || 587;
 
     const config = {
@@ -24,13 +24,20 @@ const createTransporter = () => {
             user: process.env.SMTP_USER,
             pass: process.env.SMTP_PASS,
         },
-        // Standard timeouts
         connectionTimeout: 15000,
         greetingTimeout: 15000,
         socketTimeout: 20000,
     };
 
-    console.log(`📧 Configuring SMTP with host: ${host}, port: ${port}`);
+    // 🚀 Gmail specific refinement: Use service property for more reliable connection
+    if (host.includes('gmail.com')) {
+        delete config.host;
+        delete config.port;
+        delete config.secure;
+        config.service = 'gmail';
+    }
+
+    console.log(`📧 Configuring SMTP with host: ${host}, service: ${config.service || 'custom'}`);
 
     return nodemailer.createTransport(config);
 };

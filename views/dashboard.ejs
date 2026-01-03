@@ -175,6 +175,60 @@
             class="badge protected">AUTH</span></li>
       </ul>
     </div>
+
+    <!-- Email Test Routes -->
+    <div class="card">
+      <h2>📧 Email Test Routes</h2>
+      <div style="margin-top: 10px;">
+        <input type="email" id="testEmailInput" placeholder="Enter recipient email" 
+               style="padding: 8px; border-radius: 4px; border: 1px solid #444; background: #222; color: #fff; width: 70%;">
+        <button onclick="sendTestEmail()" 
+                style="padding: 8px 15px; border-radius: 4px; border: none; background: #00d4ff; color: #000; font-weight: bold; cursor: pointer;">
+          Send
+        </button>
+        <p id="emailStatus" style="margin-top: 10px; font-size: 0.9rem;"></p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    async function sendTestEmail() {
+      const email = document.getElementById('testEmailInput').value;
+      const status = document.getElementById('emailStatus');
+      
+      if (!email) {
+        status.textContent = "Please enter an email address.";
+        status.style.color = "#f59e0b";
+        return;
+      }
+
+      status.textContent = "Sending...";
+      status.style.color = "#7dd3fc";
+
+      try {
+        const response = await fetch('/api/user/test-email', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ email })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          status.textContent = "✅ " + data.message;
+          status.style.color = "#22c55e";
+        } else {
+          status.textContent = "❌ " + (data.message || "Failed to send");
+          status.style.color = "#ef4444";
+        }
+      } catch (error) {
+        status.textContent = "❌ Error: " + error.message;
+        status.style.color = "#ef4444";
+      }
+    }
+  </script>
   </div>
 </body>
 
