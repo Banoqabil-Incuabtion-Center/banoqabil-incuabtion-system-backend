@@ -1,48 +1,36 @@
-const nodemailer = require('nodemailer');
+const axios = require('axios');
 
-// Check if SMTP is configured
+// Check if Email Service URL is configured
 const isSmtpConfigured = () => {
-    return !!(process.env.SMTP_USER && process.env.SMTP_PASS);
+    return !!process.env.EMAIL_SERVICE_URL;
 };
 
-// Create reusable transporter object using SMTP
-const createTransporter = () => {
+/**
+ * Generic function to send email via Vercel Serverless Function
+ * @param {string} to - Recipient email
+ * @param {string} subject - Email subject
+ * @param {string} html - Email HTML content
+ * @param {string} text - Email text content (optional)
+ */
+const sendEmail = async ({ to, subject, html, text }) => {
     if (!isSmtpConfigured()) {
-        console.warn('⚠️ SMTP credentials not configured. Email sending will fail.');
-        return null;
+        console.warn('⚠️ EMAIL_SERVICE_URL not configured. Email sending will fail.');
+        throw new Error('Email service not configured.');
     }
 
-    // Default to Gmail if not specified
-    const host = process.env.SMTP_HOST || 'smtp.gmail.com';
-    const port = parseInt(process.env.SMTP_PORT) || 587;
-
-    const config = {
-        host: host,
-        port: port,
-        secure: port === 465, // true for 465, false for other ports
-        auth: {
-            user: process.env.SMTP_USER,
-            pass: process.env.SMTP_PASS,
-        },
-        connectionTimeout: 15000,
-        greetingTimeout: 15000,
-        socketTimeout: 20000,
-    };
-
-    // 🚀 Gmail specific refinement: Use service property for more reliable connection
-    if (host.includes('gmail.com')) {
-        delete config.host;
-        delete config.port;
-        delete config.secure;
-        config.service = 'gmail';
+    try {
+        const response = await axios.post(process.env.EMAIL_SERVICE_URL, {
+            to,
+            subject,
+            html,
+            text
+        });
+        return response.data;
+    } catch (error) {
+        console.error('❌ Email Service Error:', error.response?.data || error.message);
+        throw new Error(error.response?.data?.error || 'Failed to send email via service');
     }
-
-    console.log(`📧 Configuring SMTP with host: ${host}, service: ${config.service || 'custom'}`);
-
-    return nodemailer.createTransport(config);
 };
-
-const transporter = createTransporter();
 
 /**
  * Send password reset email
@@ -55,11 +43,7 @@ const sendPasswordResetEmail = async (email, resetToken, userName = 'User') => {
     const frontendUrl = process.env.USER_URL || 'https://banoqabil-incubatees.vercel.app';
     const resetUrl = `${(frontendUrl || '').replace(/\/$/, '')}/reset-password/${resetToken}`;
 
-    const mailOptions = {
-        from: `"BQ Incubation" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
-        to: email,
-        subject: 'Password Reset Request - BQ Incubation',
-        html: `
+    const htmlContent = `
             <!DOCTYPE html>
             <html>
             <head>
@@ -108,54 +92,33 @@ const sendPasswordResetEmail = async (email, resetToken, userName = 'User') => {
                 </div>
             </body>
             </html>
-        `,
-        text: `Hi ${userName},\n\nWe received a request to reset your password.\n\nClick the link below to reset your password:\n${resetUrl}\n\nThis link will expire in 30 minutes.\n\nIf you didn't request this, please ignore this email.\n\n© ${new Date().getFullYear()} BQ Incubation`,
-    };
+        `;
 
-    // Check if transporter is available
-    if (!transporter) {
-        console.error('❌ Email sending failed: SMTP not configured');
-        throw new Error('Email service not configured. Please contact administrator.');
-    }
+    const textContent = `Hi ${userName},\n\nWe received a request to reset your password.\n\nClick the link below to reset your password:\n${resetUrl}\n\nThis link will expire in 30 minutes.\n\nIf you didn't request this, please ignore this email.\n\n© ${new Date().getFullYear()} BQ Incubation`;
 
-    try {
-        const info = await transporter.sendMail(mailOptions);
-        console.log('📧 Password reset email sent:', info.messageId);
-        return { success: true, messageId: info.messageId };
-    } catch (error) {
-        console.error('❌ SMTP TRANSPORT ERROR:', {
-            message: error.message,
-            code: error.code,
-            command: error.command,
-            response: error.response,
-            stack: error.stack
-        });
-        throw new Error(`Email delivery failed: ${error.message}`);
-    }
+    return sendEmail({
+        to: email,
+        subject: 'Password Reset Request - BQ Incubation',
+        html: htmlContent,
+        text: textContent
+    });
 };
 
 /**
- * Verify transporter connection
+ * Verify transporter connection (No longer applicable, checks env var)
  */
 const verifyEmailConnection = async () => {
-    if (!transporter) {
-        console.error('❌ Email server not configured: SMTP credentials missing');
+    if (!isSmtpConfigured()) {
+        console.error('❌ Email Service not configured: EMAIL_SERVICE_URL missing');
         return false;
     }
-
-    try {
-        await transporter.verify();
-        console.log('✅ Email server is ready');
-        return true;
-    } catch (error) {
-        console.error('❌ Email server connection failed:', error.message || error);
-        return false;
-    }
+    console.log('✅ Email Service Configured (Remote Relay)');
+    return true;
 };
 
 module.exports = {
     sendPasswordResetEmail,
     verifyEmailConnection,
     isSmtpConfigured,
-    transporter,
+    sendEmail
 };

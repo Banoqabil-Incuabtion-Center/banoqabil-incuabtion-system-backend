@@ -780,21 +780,20 @@ authController.sendTestEmail = async (req, res, next) => {
       return res.status(400).json({ message: "Email is required" });
     }
 
-    const { transporter, isSmtpConfigured } = require("../utils/email.util");
+    const { sendEmail, isSmtpConfigured } = require("../utils/email.util");
 
     if (!isSmtpConfigured()) {
-      return res.status(503).json({ message: "SMTP not configured" });
+      return res.status(503).json({ message: "Email Service URL not configured" });
     }
 
-    const info = await transporter.sendMail({
-      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+    const result = await sendEmail({
       to: email,
-      subject: "Test Email from BQ Incubation System",
-      text: "If you received this, your SMTP configuration is working correctly!",
-      html: "<h3>SMTP Test Successful</h3><p>Your email configuration is working correctly.</p>"
+      subject: "Test Email from BQ Incubation System (Vercel Relay)",
+      text: "If you received this, your Vercel Email Relay is working correctly!",
+      html: "<h3>SMTP Test Successful</h3><p>Your Vercel Email Relay is working correctly.</p>"
     });
 
-    res.status(200).json({ message: "Test email sent successfully", messageId: info.messageId });
+    res.status(200).json({ message: "Test email sent successfully", messageId: result.messageId });
   } catch (error) {
     console.error("Test email failed:", error);
     res.status(500).json({ message: "Failed to send test email", error: error.message });
