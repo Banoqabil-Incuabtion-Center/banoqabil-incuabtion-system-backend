@@ -440,27 +440,66 @@ attendanceController.getAttendanceStatus = async (req, res, next) => {
 // ✅ 4. Get All Users' Today's Status
 attendanceController.getAllUserStatus = async (req, res, next) => {
   try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    const skip = (page - 1) * limit;
+    const { page, limit, date, shift } = req.query;
+    const pageNum = parseInt(page) || 1;
+    const limitNum = parseInt(limit) || 10;
+    const skip = (pageNum - 1) * limitNum;
     const settings = await getSettings();
 
-    const now = moment().tz(settings.timezone);
-    const today = now.clone().startOf("day").toDate();
-    const endOfDay = now.clone().endOf("day").toDate();
+    const selectedDate = date ? moment(date).tz(settings.timezone) : moment().tz(settings.timezone);
+    const today = selectedDate.clone().startOf("day").toDate();
+    const endOfDay = selectedDate.clone().endOf("day").toDate();
 
-    const total = await User.countDocuments();
-    const users = await User.find()
+    let userQuery = {};
+    if (shift && shift !== 'all') {
+      userQuery.shift = shift;
+    }
+    if (req.query.search) {
+      const searchRegex = { $regex: new RegExp(req.query.search, "i") };
+      userQuery.$or = [
+        { name: searchRegex },
+        { email: searchRegex },
+        { bq_id: searchRegex },
+        { incubation_id: searchRegex }
+      ];
+    }
+
+    const total = await User.countDocuments(userQuery);
+    const users = await User.find(userQuery)
       .sort({ shift: 1, name: 1 })
       .skip(skip)
-      .limit(limit)
+      .limit(limitNum)
       .lean();
 
     const userIds = users.map(u => u._id);
     const attendances = await Att.find({
       user: { $in: userIds },
       createdAt: { $gte: today, $lte: endOfDay },
+      deletedAt: null
     }).lean();
+
+    // Stats for the ENTIRE filtered user set (not just current page)
+    const allFilteredUserIds = await User.find(userQuery).select('_id').lean();
+    const allIds = allFilteredUserIds.map(u => u._id);
+
+    const allAttendances = await Att.find({
+      user: { $in: allIds },
+      createdAt: { $gte: today, $lte: endOfDay },
+      deletedAt: null
+    }).lean();
+
+    const stats = {
+      total: total,
+      present: 0,
+      late: 0,
+      absent: total - allAttendances.length // Everyone else is absent
+    };
+
+    allAttendances.forEach(att => {
+      if (att.status === 'Present') stats.present++;
+      if (att.status.includes('Late')) stats.late++;
+      // If status is Absent, it's already counted in initial absent value
+    });
 
     const attendanceMap = new Map();
     attendances.forEach(att => attendanceMap.set(att.user.toString(), att));
@@ -474,6 +513,7 @@ attendanceController.getAllUserStatus = async (req, res, next) => {
         name: user.name,
         email: user.email,
         phone: user.phone,
+        avatar: user.avatar,
         assignedShift: user.shift || null,
         shiftTiming: shiftConfig ? `${shiftConfig.startHour}:00 - ${shiftConfig.endHour}:00` : null,
         status: userAtt ? userAtt.status : "Absent",
@@ -487,12 +527,14 @@ attendanceController.getAllUserStatus = async (req, res, next) => {
 
     res.json({
       data: userStatuses,
+      date: selectedDate.format("YYYY-MM-DD"),
+      stats,
       pagination: {
         total,
-        currentPage: page,
-        totalPages: Math.ceil(total / limit),
-        limit,
-        hasMore: page * limit < total,
+        currentPage: pageNum,
+        totalPages: Math.ceil(total / limitNum),
+        limit: limitNum,
+        hasMore: pageNum * limitNum < total,
       },
     });
   } catch (error) {
@@ -500,24 +542,87 @@ attendanceController.getAllUserStatus = async (req, res, next) => {
   }
 };
 
-// ✅ 5. Get Full Attendance History
-// ✅ 5. Get Full Attendance History
+// ✅ 5. Get Full Attendance History (with backend filtering)
 attendanceController.getAttendanceHistory = async (req, res, next) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
+    const { search, status, startDate, endDate, shift } = req.query;
+
+    let query = { deletedAt: null };
+
+    // 1. Status Filter
+    if (status && status !== 'all') {
+      query.status = status;
+    }
+
+    // 2. Shift Filter
+    if (shift && shift !== 'all') {
+      query.shift = shift;
+    }
+
+    // 2. Date Range Filter
+    if (startDate || endDate) {
+      query.createdAt = {};
+      if (startDate) {
+        query.createdAt.$gte = moment(startDate).startOf('day').toDate();
+      }
+      if (endDate) {
+        query.createdAt.$lte = moment(endDate).endOf('day').toDate();
+      }
+    }
+
+    // 3. Search Filter (by User Details)
+    if (search && search.trim()) {
+      const users = await User.find({
+        $or: [
+          { name: { $regex: new RegExp(search, "i") } },
+          { email: { $regex: new RegExp(search, "i") } },
+          { bq_id: { $regex: new RegExp(search, "i") } },
+          { incubation_id: { $regex: new RegExp(search, "i") } }
+        ]
+      }).select('_id');
+      const userIds = users.map(u => u._id);
+      query.user = { $in: userIds };
+    }
 
     const result = await paginate({
       model: Att,
       page,
       limit,
-      query: { deletedAt: null },
+      query,
       sort: { createdAt: -1, _id: 1 },
-      populate: { path: "user", select: "name email shift" }
+      populate: { path: "user", select: "name email shift avatar bq_id incubation_id" }
     });
 
-    res.status(200).json(result);
-    res.status(200).json(result);
+    // 4. Calculate Stats for the Entire Filtered Set
+    const statsAggregation = await Att.aggregate([
+      { $match: query },
+      {
+        $group: {
+          _id: "$status",
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
+    const stats = {
+      total: result.pagination.total,
+      present: 0,
+      late: 0,
+      absent: 0
+    };
+
+    statsAggregation.forEach(s => {
+      if (s._id === 'Present') stats.present = s.count;
+      if (s._id === 'Late' || s._id === 'Late + No Checkout') stats.late += s.count;
+      if (s._id === 'Absent') stats.absent = s.count;
+    });
+
+    res.status(200).json({
+      ...result,
+      stats
+    });
   } catch (err) {
     next(err);
   }

@@ -45,6 +45,8 @@ app.use(
       process.env.ADMIN_URL,
       // process.env.USER_URL,
       process.env.LOCAL_URL,
+      "http://localhost:5174", // Admin frontend dev
+      "http://localhost:5173", // User frontend dev
       "https://ims-frontend-admin.vercel.app",
       "https://banoqabil-incubatees.vercel.app",
     ].filter(Boolean).map(url => url.replace(/\/$/, "")),
