@@ -130,17 +130,52 @@ authController.signupGet = async (req, res, next) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
+    const { search, course, shift, gender, location } = req.query;
+
+    const query = { deletedAt: null };
+
+    if (search) {
+      const searchRegex = { $regex: new RegExp(search, "i") };
+      query.$or = [
+        { name: searchRegex },
+        { email: searchRegex },
+        { bq_id: searchRegex },
+        { incubation_id: searchRegex }
+      ];
+    }
+
+    if (course && course !== 'all') query.course = course;
+    if (shift && shift !== 'all') query.shift = shift;
+    if (gender && gender !== 'all') query.gender = gender;
+    if (location && location !== 'all') query.location = location;
 
     const result = await paginate({
       model: userModel,
       page,
       limit,
-      query: { deletedAt: null },
+      query,
       sort: { createdAt: -1, _id: 1 },
       populate: null
     });
 
-    res.status(200).json(result);
+    // Calculate Stats for the report cards
+    // We run these on the 'query' so they reflect current filters
+    const stats = {
+      total: result.pagination.total,
+      gender: await userModel.aggregate([
+        { $match: query },
+        { $group: { _id: "$gender", count: { $sum: 1 } } }
+      ]),
+      shifts: await userModel.aggregate([
+        { $match: query },
+        { $group: { _id: "$shift", count: { $sum: 1 } } }
+      ])
+    };
+
+    res.status(200).json({
+      ...result,
+      stats
+    });
 
   } catch (error) {
     next(error);
