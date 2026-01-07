@@ -4,6 +4,7 @@ const AttendanceSettings = require("../models/attendance-settings.model");
 const moment = require("moment-timezone");
 const mongoose = require("mongoose");
 const paginate = require("../utils/paginate.util");
+const calendarController = require("./calendar.controller");
 
 const attendanceController = {};
 
@@ -450,6 +451,8 @@ attendanceController.getAllUserStatus = async (req, res, next) => {
     const today = selectedDate.clone().startOf("day").toDate();
     const endOfDay = selectedDate.clone().endOf("day").toDate();
 
+    const calendarInfo = await calendarController.isNonWorkingDay(selectedDate);
+
     let userQuery = {};
     if (shift && shift !== 'all') {
       userQuery.shift = shift;
@@ -492,7 +495,7 @@ attendanceController.getAllUserStatus = async (req, res, next) => {
       total: total,
       present: 0,
       late: 0,
-      absent: total - allAttendances.length // Everyone else is absent
+      absent: calendarInfo.isNonWorking ? 0 : total - allAttendances.length
     };
 
     allAttendances.forEach(att => {
@@ -516,18 +519,20 @@ attendanceController.getAllUserStatus = async (req, res, next) => {
         avatar: user.avatar,
         assignedShift: user.shift || null,
         shiftTiming: shiftConfig ? `${shiftConfig.startHour}:00 - ${shiftConfig.endHour}:00` : null,
-        status: userAtt ? userAtt.status : "Absent",
+        status: userAtt ? userAtt.status : (calendarInfo.isNonWorking ? "Off Day" : "Absent"),
         checkInTime: userAtt?.checkInTime || null,
         checkOutTime: userAtt?.checkOutTime || null,
         hoursWorked: userAtt?.hoursWorked || 0,
         isLate: userAtt?.isLate || false,
-        isEarlyLeave: userAtt?.isEarlyLeave || false
+        isEarlyLeave: userAtt?.isEarlyLeave || false,
+        offDayReason: !userAtt && calendarInfo.isNonWorking ? calendarInfo.reason : null
       };
     });
 
     res.json({
       data: userStatuses,
       date: selectedDate.format("YYYY-MM-DD"),
+      calendarInfo,
       stats,
       pagination: {
         total,

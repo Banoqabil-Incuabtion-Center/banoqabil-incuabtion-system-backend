@@ -14,5 +14,6 @@ router.use('/api/comments', commentRoutes);
 router.use('/api/media', mediaRoute);
 router.use('/api/push', pushRoute);
 router.use('/api/messages', require("./message.route"));
+router.use('/api/calendar', require("./calendar.route"));
 
 module.exports = router;
