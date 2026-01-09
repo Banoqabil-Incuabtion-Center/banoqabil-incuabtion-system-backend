@@ -1,5 +1,5 @@
 const Calendar = require("../models/calendar.model");
-const { getSettings } = require("./attendance.controller");
+const AttendanceSettings = require("../models/attendance-settings.model");
 const moment = require("moment-timezone");
 
 const calendarController = {};
@@ -79,7 +79,7 @@ calendarController.deleteEntry = async (req, res, next) => {
 
 // Internal helper for attendance logic to check if a date is a holiday or non-working day
 calendarController.isNonWorkingDay = async (date) => {
-    const settings = await getSettings();
+    const settings = await AttendanceSettings.getSettings();
     const targetDate = moment(date).tz(settings.timezone).startOf("day");
 
     // 1. Check if it's a holiday in the calendar
