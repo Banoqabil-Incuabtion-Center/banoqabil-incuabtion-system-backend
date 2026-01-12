@@ -10,23 +10,23 @@ const userPostController = {};
 // Create User Post
 userPostController.createUserPost = async (req, res) => {
   try {
-    const { title, description, link } = req.body;
+    const { title, description, link, aspectRatio } = req.body;
     const userId = req.user.id;
 
     console.log("User ID:", userId);
+    console.log("Files received:", req.files?.length || 0);
 
-    // Validation
-    if (!title || !description) {
+    // Validation - description is required, title is optional
+    if (!description) {
       return res.status(400).json({
         errors: {
-          title: !title ? "Title is required" : undefined,
-          description: !description ? "Description is required" : undefined,
+          description: "Description is required",
         }
       });
     }
 
-    // Character count validation for title
-    if (title.length > 50) {
+    // Character count validation for title (if provided)
+    if (title && title.length > 50) {
       return res.status(400).json({
         errors: {
           title: "Title cannot exceed 50 characters",
@@ -43,36 +43,42 @@ userPostController.createUserPost = async (req, res) => {
       });
     }
 
-    // Handle image upload
-    let imageUrl = null;
-    if (req.file) {
-      imageUrl = req.file.path; // Cloudinary returns the URL in path
+    // Handle multiple image uploads
+    let imageUrls = [];
+    if (req.files && req.files.length > 0) {
+      for (const file of req.files) {
+        const imageUrl = file.path; // Cloudinary returns the URL in path
+        imageUrls.push(imageUrl);
 
-      // Create media record
-      await mediaController.createMediaRecord({
-        url: imageUrl,
-        publicId: req.file.filename, // Cloudinary public_id
-        type: 'post_image',
-        userId: userId,
-        postId: null, // Will update after post is created
-        file: req.file,
-      });
+        // Create media record for each image
+        await mediaController.createMediaRecord({
+          url: imageUrl,
+          publicId: file.filename, // Cloudinary public_id
+          type: 'post_image',
+          userId: userId,
+          postId: null, // Will update after post is created
+          file: file,
+        });
+      }
     }
 
-    // Create post with user ID and image
+    // Create post with user ID and images array
     const newPost = await userPostModel.create({
-      title,
+      title: title || '',
       description,
       link,
-      image: imageUrl,
+      images: imageUrls,
+      // Also set legacy image field for backward compatibility
+      image: imageUrls.length > 0 ? imageUrls[0] : null,
+      aspectRatio: aspectRatio || '4:5',
       user: userId
     });
 
-    // Update media record with post ID if image was uploaded
-    if (req.file && imageUrl) {
+    // Update media records with post ID
+    if (imageUrls.length > 0) {
       const Media = require('../models/media.model');
-      await Media.findOneAndUpdate(
-        { url: imageUrl, user: userId },
+      await Media.updateMany(
+        { url: { $in: imageUrls }, user: userId },
         { post: newPost._id }
       );
     }
@@ -190,6 +196,14 @@ userPostController.getUserPostsWithStats = async (req, res) => {
           user: { $arrayElemAt: ['$userInfo', 0] },
           userLiked: {
             $in: [new mongoose.Types.ObjectId(currentUserId), '$likes.user']
+          },
+          // Computed allImages for backward compatibility
+          allImages: {
+            $cond: {
+              if: { $gt: [{ $size: { $ifNull: ['$images', []] } }, 0] },
+              then: '$images',
+              else: { $cond: { if: '$image', then: ['$image'], else: [] } }
+            }
           }
         }
       },
@@ -201,6 +215,9 @@ userPostController.getUserPostsWithStats = async (req, res) => {
           description: 1,
           link: 1,
           image: 1,
+          images: 1,
+          allImages: 1,
+          aspectRatio: 1,
           createdAt: 1,
           likeCount: 1,
           commentCount: 1,
@@ -280,26 +297,80 @@ userPostController.updateUserPost = async (req, res) => {
     }
 
     // Handle image update
-    let imageUrl = post.image; // Keep existing image by default
+    let finalImages = [];
 
-    if (req.file) {
-      // Delete old image from Cloudinary if exists
-      if (post.image) {
-        await mediaController.deleteMediaByPost(id);
+    // If mediaOrder is provided, we follow it to reconstruct the image list
+    // mediaOrder should be a JSON string of array: ["old_url", "new-0", "old_url_2"]
+    if (req.body.mediaOrder) {
+      let mediaOrder = [];
+      try {
+        mediaOrder = JSON.parse(req.body.mediaOrder);
+      } catch (e) {
+        console.error("Failed to parse mediaOrder", e);
+        mediaOrder = [];
       }
 
-      // Set new image URL
-      imageUrl = req.file.path;
+      const newFiles = req.files || [];
+      const currentImages = post.images || (post.image ? [post.image] : []);
 
-      // Create new media record
-      await mediaController.createMediaRecord({
-        url: imageUrl,
-        publicId: req.file.filename,
-        type: 'post_image',
-        userId: userId,
-        postId: id,
-        file: req.file,
-      });
+      // 1. Identify valid existing images from mediaOrder
+      const keptImages = mediaOrder.filter(item => !item.startsWith('new-'));
+
+      // 2. Identify images to delete (present in DB but not in keptImages)
+      // We only delete images that were associated with THIS post
+      const imagesToDelete = currentImages.filter(url => !keptImages.includes(url));
+
+      if (imagesToDelete.length > 0) {
+        await mediaController.deleteMediaByUrls(imagesToDelete);
+      }
+
+      // 3. Reconstruct final array
+      for (const item of mediaOrder) {
+        if (item.startsWith('new-')) {
+          // It's a new file
+          const index = parseInt(item.split('-')[1]);
+          if (newFiles[index]) {
+            const file = newFiles[index];
+            const imageUrl = file.path;
+            finalImages.push(imageUrl);
+
+            // Create media record
+            await mediaController.createMediaRecord({
+              url: imageUrl,
+              publicId: file.filename,
+              type: 'post_image',
+              userId: userId,
+              postId: id,
+              file: file,
+            });
+          }
+        } else {
+          // It's an existing image URL
+          if (keptImages.includes(item)) {
+            finalImages.push(item);
+          }
+        }
+      }
+    } else {
+      // Fallback/Legacy: If no mediaOrder, but files provided -> replace all
+      if (req.files && req.files.length > 0) {
+        await mediaController.deleteMediaByPost(id);
+        for (const file of req.files) {
+          const imageUrl = file.path;
+          finalImages.push(imageUrl);
+          await mediaController.createMediaRecord({
+            url: imageUrl,
+            publicId: file.filename,
+            type: 'post_image',
+            userId: userId,
+            postId: id,
+            file: file,
+          });
+        }
+      } else {
+        // No files, no order -> keep existing
+        finalImages = post.images || (post.image ? [post.image] : []);
+      }
     }
 
     // Update post
@@ -309,7 +380,9 @@ userPostController.updateUserPost = async (req, res) => {
         title,
         description,
         link,
-        image: imageUrl,
+        images: finalImages,
+        image: finalImages.length > 0 ? finalImages[0] : null,
+        aspectRatio: req.body.aspectRatio || post.aspectRatio,
         updatedAt: new Date(),
       },
       { new: true, runValidators: true }
@@ -440,6 +513,13 @@ userPostController.getPostDetail = async (req, res) => {
           user: { $arrayElemAt: ['$userInfo', 0] },
           userLiked: {
             $in: [new mongoose.Types.ObjectId(userId), '$likes.user']
+          },
+          allImages: {
+            $cond: {
+              if: { $gt: [{ $size: { $ifNull: ['$images', []] } }, 0] },
+              then: '$images',
+              else: { $cond: { if: '$image', then: ['$image'], else: [] } }
+            }
           }
         }
       },
@@ -451,6 +531,9 @@ userPostController.getPostDetail = async (req, res) => {
           description: 1,
           link: 1,
           image: 1,
+          images: 1,
+          allImages: 1,
+          aspectRatio: 1,
           createdAt: 1,
           likesCount: 1,
           commentsCount: 1,

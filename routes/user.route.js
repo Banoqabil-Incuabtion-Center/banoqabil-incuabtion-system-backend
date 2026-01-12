@@ -4,6 +4,7 @@ const authController = require("../controllers/auth.controller")
 const attController = require("../controllers/attendance.controller")
 const validate = require("../middlewares/form-validator.middleware")
 const { registerSchema, updateRegisterSchema, loginSchema } = require("../validators/auth.validation");
+const { createPostSchema, updatePostSchema } = require("../validators/post.validation");
 const { protect } = require("../middlewares/auth.middleware");
 const userPostController = require("../controllers/user-post.controller");
 const { uploadPostImage, uploadAvatar } = require("../config/multer.config");
@@ -31,11 +32,11 @@ router.get('/active-users', protect, authController.getActiveUsers);
 router.post("/avatar", protect, uploadAvatar.single('avatar'), authController.updateAvatar);
 
 // Post routes with image upload
-router.post("/createpost", protect, uploadPostImage.single('image'), userPostController.createUserPost);
+router.post("/createpost", protect, uploadPostImage.array('images', 9), validate(createPostSchema), userPostController.createUserPost);
 router.get("/getuserpost", protect, userPostController.getUserPosts);
 router.get("/getuserpost/stats", protect, userPostController.getUserPostsWithStats);
 router.get("/getuserpost/:id", protect, userPostController.getPostDetail);
-router.put("/updateuserpost", protect, uploadPostImage.single('image'), userPostController.updateUserPost);
+router.put("/updateuserpost", protect, uploadPostImage.array('images', 9), validate(updatePostSchema), userPostController.updateUserPost);
 router.delete("/deleteuserpost", protect, userPostController.deleteUserPost);
 
 

@@ -106,6 +106,24 @@ mediaController.deleteMediaByPost = async (postId) => {
     }
 };
 
+// Helper function to delete media by URLs (array of strings)
+mediaController.deleteMediaByUrls = async (urls) => {
+    try {
+        const mediaList = await Media.find({ url: { $in: urls }, deletedAt: null });
+
+        for (const media of mediaList) {
+            if (media.publicId) {
+                await cloudinary.uploader.destroy(media.publicId);
+            }
+        }
+
+        await Media.updateMany({ url: { $in: urls } }, { deletedAt: new Date() });
+    } catch (error) {
+        console.error('Error deleting media by URLs:', error);
+        throw error;
+    }
+};
+
 // Helper function to delete old avatar
 mediaController.deleteOldAvatar = async (userId) => {
     try {
