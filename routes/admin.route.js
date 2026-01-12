@@ -13,6 +13,8 @@ const adminController = require("../controllers/admin.controller");
 
 router.post("/login", adminController.loginAdmin)
 router.post("/create", adminController.createAdmin)
+router.post("/refresh-token", adminController.refreshAccessToken)
+router.post("/logout", adminController.logout)
 
 //admin access posts
 router.post("/post", uploadPostImage.single('image'), postController.createPost)
