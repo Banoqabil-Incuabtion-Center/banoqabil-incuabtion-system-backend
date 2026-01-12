@@ -21,7 +21,7 @@ const AttSchema = mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['Present', 'Absent', 'Late', 'Early Leave', 'Late + Early Leave', 'Incomplete', 'No Checkout', 'Late + No Checkout'],
+    enum: ['Present', 'Absent', 'Late', 'Early Leave', 'Late + Early Leave', 'Incomplete', 'No Checkout', 'Late + No Checkout', 'Holiday', 'Weekend'],
     default: 'Absent'
   },
   hoursWorked: {

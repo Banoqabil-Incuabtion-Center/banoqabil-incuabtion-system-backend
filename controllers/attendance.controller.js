@@ -511,6 +511,15 @@ attendanceController.getAllUserStatus = async (req, res, next) => {
       const userAtt = attendanceMap.get(user._id.toString());
       const shiftConfig = settings.shifts[user.shift];
 
+      // Determine status for non-working days
+      let displayStatus = "Absent";
+      if (userAtt) {
+        displayStatus = userAtt.status;
+      } else if (calendarInfo.isNonWorking) {
+        // Show specific status based on type (Holiday or Weekend)
+        displayStatus = calendarInfo.type === "Holiday" ? "Holiday" : "Weekend";
+      }
+
       return {
         _id: user._id,
         name: user.name,
@@ -519,7 +528,7 @@ attendanceController.getAllUserStatus = async (req, res, next) => {
         avatar: user.avatar,
         assignedShift: user.shift || null,
         shiftTiming: shiftConfig ? `${shiftConfig.startHour}:00 - ${shiftConfig.endHour}:00` : null,
-        status: userAtt ? userAtt.status : (calendarInfo.isNonWorking ? "Off Day" : "Absent"),
+        status: displayStatus,
         checkInTime: userAtt?.checkInTime || null,
         checkOutTime: userAtt?.checkOutTime || null,
         hoursWorked: userAtt?.hoursWorked || 0,
