@@ -243,16 +243,8 @@ exports.getUserPublicKey = async (req, res) => {
 // E2E Encryption: Update current user's public key and private key backup
 exports.updatePublicKey = async (req, res) => {
     try {
-        const { publicKey, backup, pin } = req.body;
+        const { publicKey, backup } = req.body;
         console.log('🔐 E2E Debug: Updating key/backup for', req.user.id, { hasBackup: !!backup });
-
-        if (backup) {
-            // Strict 6-digit PIN validation
-            if (!pin || !/^\d{6}$/.test(pin)) {
-                console.warn('❌ E2E Debug: Invalid PIN rejected during backup setup');
-                return res.status(400).json({ error: "Invalid PIN. Must be exactly 6 digits." });
-            }
-        }
 
         const updateData = { publicKey };
 
@@ -260,6 +252,11 @@ exports.updatePublicKey = async (req, res) => {
             updateData.encryptedPrivateKey = backup.encryptedPrivateKey;
             updateData.privateKeyIv = backup.iv;
             updateData.privateKeySalt = backup.salt;
+        } else if (backup === null) {
+            // Explicitly clear backup when backup is null (key reset)
+            updateData.encryptedPrivateKey = null;
+            updateData.privateKeyIv = null;
+            updateData.privateKeySalt = null;
         }
 
         const user = await User.findByIdAndUpdate(req.user.id, updateData, { new: true });
