@@ -16,6 +16,12 @@ const messageSchema = new mongoose.Schema(
             type: String,
             required: true,
         },
+        // Store sender's public key at time of sending to ensure 
+        // message can be decrypted even if sender changes key later.
+        senderPublicKey: {
+            type: String,
+            default: null,
+        },
         // E2E Encryption fields
         iv: {
             type: String,

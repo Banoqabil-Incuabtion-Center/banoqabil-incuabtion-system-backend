@@ -37,7 +37,9 @@ exports.sendMessage = async (req, res) => {
     try {
         const { message, receiverId, iv, isEncrypted } = req.body;
         const senderId = req.user.id;
-        const senderName = req.user.name; // Assuming user middleware populates name, or need to fetch
+
+        // Fetch sender details early (needed for publicKey and push notification)
+        const sender = await User.findById(senderId).select("name avatar publicKey");
 
         let conversation = await Conversation.findOne({
             participants: { $all: [senderId, receiverId] },
@@ -55,6 +57,7 @@ exports.sendMessage = async (req, res) => {
             text: message,
             iv: iv || null,
             isEncrypted: isEncrypted || false,
+            senderPublicKey: sender?.publicKey || null, // Store sender's key
         });
 
         await newMessage.save();
@@ -69,8 +72,6 @@ exports.sendMessage = async (req, res) => {
             io.to(senderId).emit("newMessage", newMessage); // Sync sender's other devices
 
             // Send Push Notification
-            // We need sender details for the push notification title/body
-            const sender = await User.findById(senderId).select("name avatar");
             console.log("Preparing push notification for message from:", sender?.name);
 
             // For encrypted messages, show generic text since server can't decrypt
