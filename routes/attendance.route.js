@@ -8,18 +8,18 @@ const { protect } = require("../middlewares/auth.middleware");
 router.post("/checkin/:_id", protect, attendanceController.checkin);
 router.post("/checkout/:_id", protect, validateObjectId('_id'), attendanceController.checkout);
 router.get("/status/:_id", protect, validateObjectId('_id'), attendanceController.getAttendanceStatus);
-router.get("/status", attendanceController.getAllUserStatus);
-router.get("/shifts", attendanceController.getShiftInfo);
-router.get("/history", attendanceController.getAttendanceHistory);
+router.get("/status", protect, attendanceController.getAllUserStatus);
+router.get("/shifts", protect, attendanceController.getShiftInfo);
+router.get("/history", protect, attendanceController.getAttendanceHistory);
 router.get("/history/:id", protect, validateObjectId('id'), attendanceController.getUserHistoryById);
-router.get("/history/by-name/:name", attendanceController.getUserHistoryByName);
+router.get("/history/by-name/:name", protect, attendanceController.getUserHistoryByName);
 router.get("/calendar/:id", protect, validateObjectId('id'), attendanceController.getUserHistoryForCalendar);
 
 // Admin routes
-router.get("/settings", attendanceController.getSettings);
-router.put("/settings", attendanceController.updateSettings);
-router.put("/update/:attendanceId", validateObjectId('attendanceId'), attendanceController.updateAttendanceRecord);
-router.delete("/delete/:attendanceId", validateObjectId('attendanceId'), attendanceController.deleteAttendanceRecord);
+router.get("/settings", protect, attendanceController.getSettings);
+router.put("/settings", protect, attendanceController.updateSettings);
+router.put("/update/:attendanceId", protect, validateObjectId('attendanceId'), attendanceController.updateAttendanceRecord);
+router.delete("/delete/:attendanceId", protect, validateObjectId('attendanceId'), attendanceController.deleteAttendanceRecord);
 
 // Debug routes
 router.get("/check-ip", attendanceController.checkIP);

@@ -61,7 +61,7 @@ adminController.loginAdmin = async (req, res) => {
       maxAge: 30 * 24 * 60 * 60 * 1000
     };
 
-    res.cookie("refreshToken", refreshToken, cookieOptions);
+    res.cookie("adminRefreshToken", refreshToken, cookieOptions);
     // Optional: Set access token in cookie too if desired, but frontend uses header mostly. 
     // We'll set it just in case or for redundancy, but axios interceptor uses storage.
     // Actually, let's keep it consistent with user auth and provide token in body.
@@ -85,7 +85,7 @@ adminController.loginAdmin = async (req, res) => {
 // ✅ Refresh Access Token
 adminController.refreshAccessToken = async (req, res) => {
   try {
-    const refreshToken = req.cookies.refreshToken;
+    const refreshToken = req.cookies.adminRefreshToken;
 
     if (!refreshToken) {
       return res.status(401).json({ message: "No refresh token provided" });
@@ -120,7 +120,7 @@ adminController.refreshAccessToken = async (req, res) => {
 // ✅ Logout
 adminController.logout = async (req, res) => {
   try {
-    const refreshToken = req.cookies.refreshToken;
+    const refreshToken = req.cookies.adminRefreshToken;
 
     if (refreshToken) {
       const crypto = require('crypto');
@@ -142,7 +142,7 @@ adminController.logout = async (req, res) => {
       sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
     };
 
-    res.clearCookie("refreshToken", cookieOptions);
+    res.clearCookie("adminRefreshToken", cookieOptions);
     res.clearCookie("token", cookieOptions); // If we set it
 
     res.status(200).json({ message: "Logged out successfully" });
