@@ -228,7 +228,7 @@ authController.loginPost = async (req, res, next) => {
       maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
     };
 
-    res.cookie("refreshToken", refreshToken, refreshCookieOptions);
+    res.cookie("userRefreshToken", refreshToken, refreshCookieOptions);
     res.cookie("token", accessToken, accessTokenCookieOptions);
 
     // 🔥 LOG LOGIN ACTIVITY & GET DEVICE INFO
@@ -297,7 +297,7 @@ authController.loginPost = async (req, res, next) => {
 // ✅ Refresh Access Token
 authController.refreshAccessToken = async (req, res, next) => {
   try {
-    const refreshToken = req.cookies.refreshToken;
+    const refreshToken = req.cookies.userRefreshToken;
     console.log("🔄 Token refresh attempt. Cookies present:", !!req.cookies);
 
     if (!refreshToken) {
@@ -395,7 +395,7 @@ authController.logout = async (req, res, next) => {
     };
 
     res.clearCookie("token", cookieOptions);
-    res.clearCookie("refreshToken", cookieOptions);
+    res.clearCookie("userRefreshToken", cookieOptions);
 
     res.status(200).json({ message: "Logged out successfully" });
   } catch (error) {
@@ -413,18 +413,25 @@ authController.getActivities = async (req, res, next) => {
 
     const query = {};
 
+
     // Filter by user (admin can see all, user can see only their own)
     if (userId) {
       if (!isValidObjectId(userId)) {
         return res.status(400).json({ error: "Invalid User ID" });
       }
+
+      // SECURITY FIX: Ensure non-admins can only see their own activities
+      if (req.user.role !== 'admin' && req.user.id !== userId) {
+        return res.status(403).json({ error: "Unauthorized access to other user's activities" });
+      }
+
       query.userId = userId;
-    } else if (req.user && !req.user.isAdmin) {
+    } else if (req.user && req.user.role !== 'admin') {
       // If not admin, only show their own activities
       query.userId = req.user.id;
-    } else if (req.user) {
-      // User is logged in
-      query.userId = req.user.id;
+    } else if (req.user && req.user.role === 'admin') {
+      // Admin viewing all activities (no userId specified)
+      // Do nothing, query remains empty on userId filter
     }
 
     // Filter by action type
@@ -536,6 +543,11 @@ authController.updateUser = async (req, res, next) => {
       return res.status(404).json({ error: "User not found" });
     }
 
+    // SECURITY FIX: Ensure user can only update themselves
+    if (req.user.role !== 'admin' && req.user.id !== _id) {
+      return res.status(403).json({ error: "Unauthorized access" });
+    }
+
     if (email && email !== user.email) {
       const existingEmail = await userModel.findOne({
         email,
@@ -593,6 +605,12 @@ authController.deleteUser = async (req, res) => {
 
     if (!isValidObjectId(_id)) {
       return res.status(400).json({ error: "Invalid User ID format" });
+    }
+
+
+    // SECURITY FIX: Ensure user can only delete themselves (or admin)
+    if (req.user.role !== 'admin' && req.user.id !== _id) {
+      return res.status(403).json({ error: "Unauthorized access" });
     }
 
     const deleted = await userModel.findByIdAndUpdate(

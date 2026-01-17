@@ -143,6 +143,11 @@ attendanceController.checkin = async (req, res, next) => {
     const { _id } = req.params;
     const settings = await getSettings();
 
+    // SECURITY FIX: User can only check in themselves
+    if (req.user.role !== 'admin' && req.user.id !== _id) {
+      return res.status(403).json({ error: "Unauthorized access: You can only check-in for your own account" });
+    }
+
     // IP validation
     const allowedIPs = [
       process.env.IP_ADDRESS_ONE,
@@ -260,6 +265,11 @@ attendanceController.checkout = async (req, res, next) => {
     const { _id } = req.params;
     const settings = await getSettings();
 
+    // SECURITY FIX: User can only check out themselves
+    if (req.user.role !== 'admin' && req.user.id !== _id) {
+      return res.status(403).json({ error: "Unauthorized access: You can only check-out for your own account" });
+    }
+
     const allowedIPs = [
       process.env.IP_ADDRESS_ONE,
       process.env.IP_ADDRESS_TWO,
@@ -370,6 +380,11 @@ attendanceController.getAttendanceStatus = async (req, res, next) => {
   try {
     const { _id } = req.params;
     const settings = await getSettings();
+
+    // SECURITY FIX: User can only view their own status
+    if (req.user.role !== 'admin' && req.user.id !== _id) {
+      return res.status(403).json({ error: "Unauthorized access" });
+    }
 
     const user = await User.findById(_id);
     if (!user) return res.status(404).json({ error: "User not found" });
@@ -586,8 +601,14 @@ attendanceController.getAttendanceHistory = async (req, res, next) => {
       }
     }
 
-    // 3. Search Filter (by User Details)
-    if (search && search.trim()) {
+    // SECURITY FIX: Non-admins can strictly ONLY see their own history
+    if (req.user.role !== 'admin') {
+      // Force filter to current user regardless of other params
+      query.user = req.user.id;
+    }
+
+    // 3. Search Filter (by User Details) - ADMIN ONLY
+    if (search && search.trim() && req.user.role === 'admin') {
       const users = await User.find({
         $or: [
           { name: { $regex: new RegExp(search, "i") } },
@@ -650,6 +671,11 @@ attendanceController.getUserHistoryByName = async (req, res, next) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
 
+    // SECURITY FIX: Only Admin can search by name
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: "Unauthorized: Only admins can search history by name" });
+    }
+
     if (!name?.trim()) {
       return res.status(400).json({ error: "Name parameter is required" });
     }
@@ -688,6 +714,11 @@ attendanceController.getUserHistoryById = async (req, res, next) => {
   try {
     const { id } = req.params;
     const page = parseInt(req.query.page) || 1;
+
+    // SECURITY FIX: User can only view their own history
+    if (req.user.role !== 'admin' && req.user.id !== id) {
+      return res.status(403).json({ error: "Unauthorized access" });
+    }
     const limit = parseInt(req.query.limit) || 10;
 
     if (!id || !isValidObjectId(id)) {
@@ -747,6 +778,11 @@ attendanceController.updateAttendanceRecord = async (req, res, next) => {
   try {
     const { attendanceId } = req.params;
 
+    // SECURITY FIX: Only Admin can update attendance records
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: "Unauthorized: Admin access required" });
+    }
+
     if (!attendanceId || !isValidObjectId(attendanceId)) {
       return res.status(400).json({ error: "Valid Attendance ID is required" });
     }
@@ -782,6 +818,11 @@ attendanceController.updateAttendanceRecord = async (req, res, next) => {
 attendanceController.deleteAttendanceRecord = async (req, res, next) => {
   try {
     const { attendanceId } = req.params;
+
+    // SECURITY FIX: Only Admin can delete attendance records
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: "Unauthorized: Admin access required" });
+    }
 
     if (!attendanceId || !isValidObjectId(attendanceId)) {
       return res.status(400).json({ error: "Valid Attendance ID is required" });
@@ -845,6 +886,11 @@ attendanceController.updateSettings = async (req, res, next) => {
   try {
     const updates = req.body;
 
+    // SECURITY FIX: Only Admin can update settings
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: "Unauthorized: Admin access required" });
+    }
+
     let settings = await AttendanceSettings.findOne({ isActive: true });
     if (!settings) {
       settings = await AttendanceSettings.getSettings();
@@ -880,6 +926,11 @@ attendanceController.getUserHistoryForCalendar = async (req, res, next) => {
   try {
     const { id } = req.params;
     const { month, year } = req.query;
+
+    // SECURITY FIX: User can only view their own calendar
+    if (req.user.role !== 'admin' && req.user.id !== id) {
+      return res.status(403).json({ error: "Unauthorized access" });
+    }
 
     if (!id || !isValidObjectId(id)) {
       return res.status(400).json({ error: "Valid User ID is required" });
