@@ -3,6 +3,7 @@ const moment = require("moment-timezone");
 const User = require("../models/user.model");
 const Attendance = require("../models/attendance.model");
 const AttendanceSettings = require("../models/attendance-settings.model");
+const Calendar = require("../models/calendar.model");
 
 const markAbsentJob = async (options = {}) => {
     const { dryRun = false } = options;
@@ -42,67 +43,108 @@ const markAbsentJob = async (options = {}) => {
         const startOfDay = targetDate.clone().startOf("day").toDate();
         const endOfDay = targetDate.clone().endOf("day").toDate();
 
+        // 🗓️ Check for Calendar Events (Holiday / Working Day)
+        // We look for any event that overlaps with the target day and is of type Holiday or Working Day
+        const calendarEvent = await Calendar.findOne({
+            type: { $in: ["Holiday", "Working Day"] },
+            startDate: { $lte: endOfDay },
+            endDate: { $gte: startOfDay },
+            deletedAt: null
+        });
+
+        const isGlobalHoliday = calendarEvent?.type === "Holiday";
+        const isForcedWorkingDay = calendarEvent?.type === "Working Day";
+
+        if (isGlobalHoliday) console.log(`🎉 Holiday detected: ${calendarEvent.title}`);
+        if (isForcedWorkingDay) console.log(`💼 Forced Working Day detected: ${calendarEvent.title}`);
+
         // Fetch all active users
         const users = await User.find({ deletedAt: null });
 
         let parsedUsers = 0;
         let markedAbsent = 0;
+        let markedHoliday = 0;
 
         for (const user of users) {
             parsedUsers++;
 
-            // 1. Determine Working Days
-            let workingDays = user.workingDays;
-            if (!workingDays || workingDays.length === 0) {
-                // Fallback to shift settings
-                if (user.shift && settings.shifts[user.shift]) {
-                    workingDays = settings.shifts[user.shift].workingDays;
-                }
-            }
-
-            // If still no working days defined (e.g. no shift?), default to Mon-Fri
-            if (!workingDays) {
-                workingDays = [1, 2, 3, 4, 5];
-            }
-
-            // 2. Check if TARGET DATE was a working day for this user
-            if (!workingDays.includes(targetDay)) {
-                continue; // Not a working day, skip
-            }
-
-            // 3. Check if attendance exists for TARGET DATE
+            // 1. Check if attendance exists for TARGET DATE
             const exists = await Attendance.findOne({
                 user: user._id,
                 createdAt: { $gte: startOfDay, $lte: endOfDay }
             });
 
             if (!exists) {
-                // 4. Mark Absent
-                if (!dryRun) {
-                    await Attendance.create({
-                        user: user._id,
-                        shift: user.shift || "Morning", // Fallback if missing
-                        status: "Absent",
-                        checkInTime: null,
-                        checkOutTime: null,
-                        hoursWorked: 0,
-                        isLate: false,
-                        isEarlyLeave: false,
-                        createdAt: startOfDay // Backdate to the start of yesterday to keep records consistent
-                    });
-
-                    // Increment Absent Count in User Stats
-                    await User.findByIdAndUpdate(user._id, { $inc: { "attendanceStats.absent": 1 } });
-                    console.log(`Marked ${user.name} as Absent for ${targetDate.format("YYYY-MM-DD")}`);
-                } else {
-                    console.log(`[DRY RUN] Would mark ${user.name} as Absent for ${targetDate.format("YYYY-MM-DD")}`);
+                // 2. Handle Holiday
+                if (isGlobalHoliday) {
+                    if (!dryRun) {
+                        await Attendance.create({
+                            user: user._id,
+                            shift: user.shift || "Morning",
+                            status: "Holiday",
+                            checkInTime: null,
+                            checkOutTime: null,
+                            hoursWorked: 0,
+                            isLate: false,
+                            isEarlyLeave: false,
+                            createdAt: startOfDay
+                        });
+                        console.log(`Marked ${user.name} as Holiday for ${targetDateString}`);
+                    } else {
+                        console.log(`[DRY RUN] Would mark ${user.name} as Holiday`);
+                    }
+                    markedHoliday++;
+                    continue; // Skip to next user
                 }
-                markedAbsent++;
+
+                // 3. Determine Working Status
+                let shouldMarkAbsent = false;
+
+                if (isForcedWorkingDay) {
+                    shouldMarkAbsent = true; // It's a working day for everyone
+                } else {
+                    // Standard Logic: Check user's working days
+                    let workingDays = user.workingDays;
+                    if (!workingDays || workingDays.length === 0) {
+                        if (user.shift && settings.shifts[user.shift]) {
+                            workingDays = settings.shifts[user.shift].workingDays;
+                        }
+                    }
+                    if (!workingDays) workingDays = [1, 2, 3, 4, 5]; // Default Mon-Fri
+
+                    if (workingDays.includes(targetDay)) {
+                        shouldMarkAbsent = true;
+                    }
+                }
+
+                // 4. Mark Absent if needed
+                if (shouldMarkAbsent) {
+                    if (!dryRun) {
+                        await Attendance.create({
+                            user: user._id,
+                            shift: user.shift || "Morning", // Fallback if missing
+                            status: "Absent",
+                            checkInTime: null,
+                            checkOutTime: null,
+                            hoursWorked: 0,
+                            isLate: false,
+                            isEarlyLeave: false,
+                            createdAt: startOfDay // Backdate
+                        });
+
+                        // Increment Absent Count
+                        await User.findByIdAndUpdate(user._id, { $inc: { "attendanceStats.absent": 1 } });
+                        console.log(`Marked ${user.name} as Absent for ${targetDateString}`);
+                    } else {
+                        console.log(`[DRY RUN] Would mark ${user.name} as Absent`);
+                    }
+                    markedAbsent++;
+                }
             }
         }
 
-        console.log(`✅ Absence Job Completed. ${dryRun ? "[DRY RUN] " : ""}Processed ${parsedUsers} users. ${dryRun ? "Would have marked" : "Marked"} ${markedAbsent} as Absent.`);
-        return { success: true, parsedUsers, markedAbsent, dryRun };
+        console.log(`✅ Absence Job Completed. ${dryRun ? "[DRY RUN] " : ""}Processed ${parsedUsers} users. Absent: ${markedAbsent}, Holiday: ${markedHoliday}.`);
+        return { success: true, parsedUsers, markedAbsent, markedHoliday, dryRun };
 
     } catch (error) {
         console.error("❌ Error in absence marking job:", error);
