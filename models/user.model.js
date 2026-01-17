@@ -109,6 +109,14 @@ const userSchema = new mongoose.Schema({
     leaves: { type: Number, default: 0 },
     totalHours: { type: Number, default: 0 }
   },
+  isVerified: {
+    type: Boolean,
+    default: false,
+  },
+  verificationToken: {
+    type: String,
+    default: null,
+  },
   // E2E Encryption fields
   publicKey: {
     type: String,

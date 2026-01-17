@@ -5,7 +5,8 @@ const { UsertokenGenerator } = require("../utils/token.util");
 const paginate = require("../utils/paginate.util");
 const mongoose = require("mongoose");
 const { parseUserAgent, getClientIP, getLocationFromIP } = require("../utils/deviceDetector.util");
-const { sendPasswordResetEmail, isSmtpConfigured } = require("../utils/email.util");
+const { sendPasswordResetEmail, sendVerificationEmail, isSmtpConfigured } = require("../utils/email.util");
+const crypto = require('crypto');
 
 const authController = {};
 
@@ -85,6 +86,9 @@ authController.signupPost = async (req, res, next) => {
     const salt = await bcrypt.genSalt(10);
     const hash = await bcrypt.hash(password, salt);
 
+    // Generate Verification Token
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+
     await userModel.create({
       bq_id,
       name,
@@ -97,10 +101,23 @@ authController.signupPost = async (req, res, next) => {
       shift,
       location,
       dob,
-      termsAccepted
+      termsAccepted,
+      verificationToken,
+      isVerified: false // Explicitly set to false
     });
 
-    return res.status(201).json({ message: "Account created successfully" });
+    // Send Verification Email
+    try {
+      if (isSmtpConfigured()) {
+        await sendVerificationEmail(email, verificationToken, name);
+        console.log(`✅ Verification email sent to ${email}`);
+      }
+    } catch (emailError) {
+      console.error("❌ Failed to send verification email:", emailError);
+      // Proceed without failing signup, user can request resend later (if implemented) or admin can verify
+    }
+
+    return res.status(201).json({ message: "Account created successfully. Please check your email to verify your account." });
   } catch (error) {
     next(error);
   }
@@ -197,6 +214,11 @@ authController.loginPost = async (req, res, next) => {
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(400).json({ message: 'Invalid Email or Password' });
+    }
+
+    // Check Verification Status
+    if (!user.isVerified) {
+      return res.status(403).json({ message: 'Please verify your email to login. Check your inbox/spam for the verification link.' });
     }
 
     // Generate tokens
@@ -799,30 +821,121 @@ authController.resetPassword = async (req, res, next) => {
     });
 
     if (!user) {
-      return res.status(400).json({
-        message: "Password reset link is invalid or has expired"
-      });
+      return res.status(400).json({ message: "Invalid or expired token" });
     }
 
     // Hash new password
     const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
+    const hash = await bcrypt.hash(password, salt);
 
-    // Update password and clear reset token
-    user.password = hashedPassword;
-    user.resetPasswordToken = null;
-    user.resetPasswordExpires = null;
+    // Update user
+    user.password = hash;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpires = undefined;
     await user.save();
 
-    console.log(`✅ Password reset successful for ${user.email}`);
-
-    res.status(200).json({
-      message: "Password has been reset successfully. You can now login with your new password."
-    });
+    res.status(200).json({ message: "Password reset successfully. You can now login." });
   } catch (error) {
     next(error);
   }
 };
+
+// ✅ Verify Email
+authController.verifyEmail = async (req, res, next) => {
+  try {
+    const { token } = req.params;
+
+    if (!token) {
+      return res.status(400).json({ message: "Verification token is required" });
+    }
+
+    const user = await userModel.findOne({ verificationToken: token });
+
+    if (!user) {
+      return res.status(400).json({ message: "Invalid or expired verification token" });
+    }
+
+    if (user.isVerified) {
+      return res.status(200).json({ message: "Email already verified. You can login now." });
+    }
+
+    user.isVerified = true;
+    user.verificationToken = null; // Clear token after usage
+    await user.save();
+
+    res.status(200).json({ message: "Email verified successfully!" });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ✅ Resend Verification Email
+authController.resendVerificationEmail = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+
+    const user = await userModel.findOne({ email: email.toLowerCase(), deletedAt: null });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (user.isVerified) {
+      return res.status(400).json({ message: "Email is already verified" });
+    }
+
+    // Generate new token if needed, or reuse. Let's generate a new one to be safe/fresh.
+    const crypto = require('crypto');
+    const verificationToken = crypto.randomBytes(32).toString("hex");
+
+    user.verificationToken = verificationToken;
+    await user.save();
+
+    const { sendVerificationEmail } = require("../utils/email.util");
+    await sendVerificationEmail(user.email, verificationToken, user.name);
+
+    res.status(200).json({ message: "Verification email sent successfully!" });
+
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ✅ Admin Verify User
+authController.adminVerifyUser = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    if (!isValidObjectId(id)) {
+      return res.status(400).json({ error: "Invalid User ID" });
+    }
+
+    // Check if admin (Middleware usually handles this, but explicit check good for safety functions)
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: "Unauthorized access" });
+    }
+
+    const user = await userModel.findByIdAndUpdate(
+      id,
+      { isVerified: true, verificationToken: null },
+      { new: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    res.status(200).json({ message: "User verified successfully", user });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
 
 
 // ✅ Test Email Config
