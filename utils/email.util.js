@@ -23,16 +23,18 @@ const sendEmail = async ({ to, subject, html, text }) => {
     // Option 1: Vercel/Remote Relay
     if (process.env.EMAIL_SERVICE_URL) {
         try {
+            console.log(`📡 Sending email via Vercel Relay: ${process.env.EMAIL_SERVICE_URL}`);
             const response = await axios.post(process.env.EMAIL_SERVICE_URL, {
                 to,
                 subject,
                 html,
                 text
             });
+            console.log(`✅ Email sent via Vercel Relay. Response:`, response.data);
             return response.data;
         } catch (error) {
             console.error('❌ Email Service Relay Error:', error.response?.data || error.message);
-            // Fallback to SMTP if Relay fails and SMTP is present? For now, just throw/log.
+            // Fallback to SMTP if Relay fails and SMTP is present
             if (!process.env.SMTP_HOST) throw error;
             console.log('🔄 Falling back to SMTP...');
         }

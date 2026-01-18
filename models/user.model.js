@@ -117,6 +117,10 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: null,
   },
+  verificationTokenExpires: {
+    type: Date,
+    default: null,
+  },
   // E2E Encryption fields
   publicKey: {
     type: String,

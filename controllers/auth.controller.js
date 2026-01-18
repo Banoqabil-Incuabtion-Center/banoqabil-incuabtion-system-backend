@@ -5,7 +5,7 @@ const { UsertokenGenerator } = require("../utils/token.util");
 const paginate = require("../utils/paginate.util");
 const mongoose = require("mongoose");
 const { parseUserAgent, getClientIP, getLocationFromIP } = require("../utils/deviceDetector.util");
-const { sendPasswordResetEmail, sendVerificationEmail, isSmtpConfigured } = require("../utils/email.util");
+const { sendPasswordResetEmail, sendVerificationEmail, isSmtpConfigured, sendEmail } = require("../utils/email.util");
 const crypto = require('crypto');
 
 const authController = {};
@@ -87,7 +87,14 @@ authController.signupPost = async (req, res, next) => {
     const hash = await bcrypt.hash(password, salt);
 
     // Generate Verification Token
+    const crypto = require('crypto');
     const verificationToken = crypto.randomBytes(32).toString('hex');
+
+    // Hash token for storage
+    const hashedVerificationToken = crypto
+      .createHash('sha256')
+      .update(verificationToken)
+      .digest('hex');
 
     await userModel.create({
       bq_id,
@@ -102,19 +109,19 @@ authController.signupPost = async (req, res, next) => {
       location,
       dob,
       termsAccepted,
-      verificationToken,
+      verificationToken: hashedVerificationToken,
+      verificationTokenExpires: Date.now() + 24 * 60 * 60 * 1000, // 24 hours
       isVerified: false // Explicitly set to false
     });
 
-    // Send Verification Email
     try {
       if (isSmtpConfigured()) {
-        await sendVerificationEmail(email, verificationToken, name);
+        await sendVerificationEmail(email, verificationToken, name); // Send raw token
         console.log(`✅ Verification email sent to ${email}`);
       }
     } catch (emailError) {
       console.error("❌ Failed to send verification email:", emailError);
-      // Proceed without failing signup, user can request resend later (if implemented) or admin can verify
+      // Proceed without failing signup, user can request resend later
     }
 
     return res.status(201).json({ message: "Account created successfully. Please check your email to verify your account." });
@@ -849,7 +856,17 @@ authController.verifyEmail = async (req, res, next) => {
       return res.status(400).json({ message: "Verification token is required" });
     }
 
-    const user = await userModel.findOne({ verificationToken: token });
+    // Hash the incoming token to compare with stored hash
+    const crypto = require('crypto');
+    const hashedToken = crypto
+      .createHash('sha256')
+      .update(token)
+      .digest('hex');
+
+    const user = await userModel.findOne({
+      verificationToken: hashedToken,
+      verificationTokenExpires: { $gt: Date.now() }
+    });
 
     if (!user) {
       return res.status(400).json({ message: "Invalid or expired verification token" });
@@ -861,6 +878,7 @@ authController.verifyEmail = async (req, res, next) => {
 
     user.isVerified = true;
     user.verificationToken = null; // Clear token after usage
+    user.verificationTokenExpires = null;
     await user.save();
 
     res.status(200).json({ message: "Email verified successfully!" });
@@ -888,15 +906,38 @@ authController.resendVerificationEmail = async (req, res, next) => {
       return res.status(400).json({ message: "Email is already verified" });
     }
 
-    // Generate new token if needed, or reuse. Let's generate a new one to be safe/fresh.
+    // Generate new token
     const crypto = require('crypto');
     const verificationToken = crypto.randomBytes(32).toString("hex");
 
-    user.verificationToken = verificationToken;
+    // Hash token for storage
+    const hashedVerificationToken = crypto
+      .createHash('sha256')
+      .update(verificationToken)
+      .digest('hex');
+
+    user.verificationToken = hashedVerificationToken;
+    user.verificationTokenExpires = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
     await user.save();
 
-    const { sendVerificationEmail } = require("../utils/email.util");
-    await sendVerificationEmail(user.email, verificationToken, user.name);
+    // Check if email service is configured
+    if (!isSmtpConfigured()) {
+      console.warn("⚠️ SMTP/Email Service not configured. Cannot send verification email.");
+      return res.status(503).json({
+        message: "Email service is temporarily unavailable. Please try again later or contact support."
+      });
+    }
+
+    try {
+      await sendVerificationEmail(user.email, verificationToken, user.name); // Send raw token
+      console.log(`✅ Verification email resent to ${user.email}`);
+    } catch (emailError) {
+      console.error("❌ Failed to resend verification email:", emailError);
+      return res.status(500).json({
+        message: "Failed to send verification email.",
+        error: emailError.message
+      });
+    }
 
     res.status(200).json({ message: "Verification email sent successfully!" });
 
@@ -921,7 +962,7 @@ authController.adminVerifyUser = async (req, res, next) => {
 
     const user = await userModel.findByIdAndUpdate(
       id,
-      { isVerified: true, verificationToken: null },
+      { isVerified: true, verificationToken: null, verificationTokenExpires: null },
       { new: true }
     );
 
@@ -945,8 +986,6 @@ authController.sendTestEmail = async (req, res, next) => {
     if (!email) {
       return res.status(400).json({ message: "Email is required" });
     }
-
-    const { sendEmail, isSmtpConfigured } = require("../utils/email.util");
 
     if (!isSmtpConfigured()) {
       return res.status(503).json({ message: "Email Service URL not configured" });
