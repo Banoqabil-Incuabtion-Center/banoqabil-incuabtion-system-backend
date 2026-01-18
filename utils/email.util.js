@@ -16,37 +16,47 @@ const isSmtpConfigured = () => {
  */
 const sendEmail = async ({ to, subject, html, text }) => {
     if (!isSmtpConfigured()) {
-        console.warn('⚠️ No Email Configuration found (SMTP or Relay). Email sending will fail.');
-        throw new Error('Email service not configured.');
+        const error = new Error('Email service not configured. Please set EMAIL_SERVICE_URL or SMTP_HOST.');
+        console.error(`❌ ${error.message}`);
+        throw error;
     }
 
-    // Option 1: Vercel/Remote Relay
+    const errors = [];
+
+    // 🚀 Priority 1: Vercel Microservice Relay
     if (process.env.EMAIL_SERVICE_URL) {
         try {
-            console.log(`📡 Sending email via Vercel Relay: ${process.env.EMAIL_SERVICE_URL}`);
+            console.log(`📡 Attempting email via Vercel Relay: ${process.env.EMAIL_SERVICE_URL}`);
             const response = await axios.post(process.env.EMAIL_SERVICE_URL, {
                 to,
                 subject,
                 html,
                 text
-            });
-            console.log(`✅ Email sent via Vercel Relay. Response:`, response.data);
+            }, { timeout: 10000 }); // 10s timeout
+
+            console.log(`✅ Email sent successfully via Vercel Relay:`, response.data.messageId || 'Success');
             return response.data;
         } catch (error) {
-            console.error('❌ Email Service Relay Error:', error.response?.data || error.message);
-            // Fallback to SMTP if Relay fails and SMTP is present
-            if (!process.env.SMTP_HOST) throw error;
-            console.log('🔄 Falling back to SMTP...');
+            const relayError = error.response?.data?.details || error.response?.data?.error || error.message;
+            console.error(`⚠️ Vercel Relay failed: ${relayError}`);
+            errors.push(`Relay: ${relayError}`);
+
+            // If strictly using relay or no SMTP fallback, throw now
+            if (!process.env.SMTP_HOST) {
+                throw new Error(`Email failed (Relay): ${relayError}`);
+            }
+            console.log('🔄 Falling back to direct SMTP...');
         }
     }
 
-    // Option 2: Direct SMTP (Nodemailer)
+    // 📧 Priority 2: Direct SMTP (Nodemailer)
     if (process.env.SMTP_HOST) {
         try {
+            console.log(`📧 Attempting direct SMTP: ${process.env.SMTP_HOST}`);
             const transporter = nodemailer.createTransport({
                 host: process.env.SMTP_HOST,
-                port: process.env.SMTP_PORT || 587,
-                secure: false, // true for 465, false for other ports
+                port: parseInt(process.env.SMTP_PORT || '587'),
+                secure: parseInt(process.env.SMTP_PORT || '587') === 465,
                 auth: {
                     user: process.env.SMTP_USER,
                     pass: process.env.SMTP_PASS,
@@ -54,18 +64,19 @@ const sendEmail = async ({ to, subject, html, text }) => {
             });
 
             const info = await transporter.sendMail({
-                from: process.env.SMTP_FROM || '"BQ Incubation" <no-reply@bqincubation.com>',
+                from: process.env.SMTP_FROM || `"BQ Incubation" <no-reply@bqincubation.com>`,
                 to,
                 subject,
-                text,
+                text: text || "HTML version only available.",
                 html,
             });
 
-            console.log("✅ Email sent via SMTP: %s", info.messageId);
+            console.log(`✅ Email sent successfully via Direct SMTP: ${info.messageId}`);
             return info;
         } catch (error) {
-            console.error("❌ SMTP Error:", error);
-            throw new Error('Failed to send email via SMTP');
+            console.error(`❌ Direct SMTP failed: ${error.message}`);
+            errors.push(`SMTP: ${error.message}`);
+            throw new Error(`Email failed to send. [${errors.join(' | ')}]`);
         }
     }
 };

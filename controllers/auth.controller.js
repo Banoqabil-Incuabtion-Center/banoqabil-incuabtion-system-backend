@@ -114,14 +114,16 @@ authController.signupPost = async (req, res, next) => {
       isVerified: false // Explicitly set to false
     });
 
+    // 📧 Send Verification Email (Vercel Relay Priority)
     try {
       if (isSmtpConfigured()) {
-        await sendVerificationEmail(email, verificationToken, name); // Send raw token
-        console.log(`✅ Verification email sent to ${email}`);
+        await sendVerificationEmail(email, verificationToken, name);
+      } else {
+        console.warn("⚠️ SMTP not configured. Account created but no verification email sent.");
       }
     } catch (emailError) {
-      console.error("❌ Failed to send verification email:", emailError);
-      // Proceed without failing signup, user can request resend later
+      console.error("❌ Signup Email Warning:", emailError.message);
+      // We don't fail registration if email fails, user can resend later
     }
 
     return res.status(201).json({ message: "Account created successfully. Please check your email to verify your account." });
@@ -749,36 +751,26 @@ authController.forgotPassword = async (req, res, next) => {
     );
     console.log('✅ User updated successfully in database');
 
-    // Send email with the plain token (not hashed)
+    // 📧 Send Password Reset Email
     try {
-      console.log('📧 Preparing to send email...');
-
       if (!isSmtpConfigured()) {
-        console.error('❌ SMTP not configured in environment variables');
-        return res.status(503).json({
-          message: "Email service is currently unavailable. Please contact administrator to setup SMTP credentials."
-        });
+        throw new Error("Email service is not configured. Please setup SMTP or Vercel Relay.");
       }
 
       await sendPasswordResetEmail(user.email, resetToken, user.name);
-      console.log(`✅ Password reset email sent successfully to ${user.email}`);
+      console.log(`✅ Password reset email sent to ${user.email}`);
     } catch (emailError) {
-      console.error('❌ SMTP Error Detail:', emailError.message || emailError);
+      console.error('❌ Forgot Password Email Error:', emailError.message);
 
-      // Clear token if email fails
-      try {
-        await userModel.findOneAndUpdate(
-          { _id: user._id },
-          { resetPasswordToken: null, resetPasswordExpires: null },
-          { runValidators: false }
-        );
-        console.log('🧹 Cleanup: Reset token cleared after email failure');
-      } catch (cleanupError) {
-        console.error('⚠️ Cleanup failed:', cleanupError.message);
-      }
+      // Rollback: Clear token in DB if email strictly fails
+      await userModel.findOneAndUpdate(
+        { _id: user._id },
+        { resetPasswordToken: null, resetPasswordExpires: null }
+      ).catch(err => console.error("⚠️ Token cleanup failed:", err.message));
 
       return res.status(500).json({
-        message: `Failed to send email: ${emailError.message || 'Unknown SMTP error'}. Please try again later.`
+        message: "Failed to send reset email.",
+        error: emailError.message
       });
     }
 
