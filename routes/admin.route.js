@@ -9,9 +9,11 @@ const validate = require("../middlewares/form-validator.middleware")
 const { TeamSchema, UpdateTeamSchema } = require("../validators/team.validation");
 const { ProjectSchema, UpdateProjectSchema } = require("../validators/project.validation");
 const adminController = require("../controllers/admin.controller");
+const dashboardController = require("../controllers/dashboard.controller");
 
 
 router.post("/login", adminController.loginAdmin)
+router.get("/dashboard-stats", dashboardController.getStats)
 router.post("/create", adminController.createAdmin)
 router.post("/refresh-token", adminController.refreshAccessToken)
 router.post("/logout", adminController.logout)
