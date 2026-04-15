@@ -16,7 +16,8 @@ if (process.env.NODE_ENV !== "production") {
     console.warn("⚠️ .env.development not found");
   }
 } else {
-  console.log("🚀 Running in production mode (Vercel environment vars)");
+  dotenv.config({ path: ".env" });
+  console.log("🚀 Running in production mode");
 }
 
 const indexRoute = require("./routes/index.route");
