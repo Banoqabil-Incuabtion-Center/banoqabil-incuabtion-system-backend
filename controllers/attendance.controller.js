@@ -155,7 +155,7 @@ attendanceController.checkin = async (req, res, next) => {
       ...settings.allowedIPs
     ].filter(Boolean).map(ip => ip.trim());
 
-    const rawIP = req.headers["x-forwarded-for"]?.split(",")[0] || req.connection.remoteAddress;
+    const rawIP = req.headers["x-forwarded-for"]?.split(",")[0] || req.headers["x-real-ip"] || req.connection.remoteAddress;
     const clientIP = normalizeIP(rawIP);
 
     console.log("--- Check-in Debug ---");
@@ -276,7 +276,7 @@ attendanceController.checkout = async (req, res, next) => {
       ...settings.allowedIPs
     ].filter(Boolean).map(ip => ip.trim());
 
-    const rawIP = req.headers["x-forwarded-for"]?.split(",")[0] || req.connection.remoteAddress;
+    const rawIP = req.headers["x-forwarded-for"]?.split(",")[0] || req.headers["x-real-ip"] || req.connection.remoteAddress;
     const clientIP = normalizeIP(rawIP);
 
     console.log("--- Check-out Debug ---");
@@ -1034,7 +1034,7 @@ attendanceController.getUserHistoryForCalendar = async (req, res, next) => {
 attendanceController.checkIP = async (req, res) => {
   try {
     const settings = await getSettings();
-    const rawIP = req.headers["x-forwarded-for"]?.split(",")[0] || req.connection.remoteAddress;
+    const rawIP = req.headers["x-forwarded-for"]?.split(",")[0] || req.headers["x-real-ip"] || req.connection.remoteAddress;
     const clientIP = normalizeIP(rawIP);
 
     res.json({
