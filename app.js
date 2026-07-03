@@ -39,18 +39,32 @@ const server = http.createServer(app);
 const io = initializeSocket(server);
 console.log("✅ Socket.IO initialized");
 
-// 1. CORS - MUST be first to handle preflights correctly
+const allowedOrigins = [
+  process.env.ADMIN_URL,
+  process.env.USER_URL,
+  process.env.LOCAL_URL,
+  "http://localhost:5174",
+  "http://localhost:5173",
+  "https://banoqabil-incubatees.vercel.app",
+  "https://banoqabil-incubation-management-sys.vercel.app",
+  "https://ims.banoqabil.online"
+].filter(Boolean).map(url => url.replace(/\/$/, ""));
+
 app.use(
   cors({
-    origin: [
-      process.env.ADMIN_URL,
-      // process.env.USER_URL,
-      process.env.LOCAL_URL,
-      "http://localhost:5174",
-      "http://localhost:5173",
-      "https://banoqabil-incubatees.vercel.app",
-      "https://banoqabil-incubation-management-sys.vercel.app/"
-    ].filter(Boolean).map(url => url.replace(/\/$/, "")),
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps or curl)
+      if (!origin) return callback(null, true);
+      
+      const isAllowed = allowedOrigins.includes(origin) || 
+                        /^https?:\/\/(?:[a-z0-9-]+\.)*banoqabil\.online$/.test(origin);
+      
+      if (isAllowed) {
+        callback(null, true);
+      } else {
+        callback(null, false);
+      }
+    },
     credentials: true,
   })
 );

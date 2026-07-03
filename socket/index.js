@@ -5,12 +5,28 @@ const jwt = require('jsonwebtoken');
 let io;
 
 const initializeSocket = (server) => {
+    const allowedOrigins = [
+        process.env.ADMIN_URL,
+        process.env.USER_URL,
+        "http://localhost:5174",
+        "http://localhost:5173",
+        "https://banoqabil-incubatees.vercel.app",
+        "https://banoqabil-incubation-management-sys.vercel.app",
+        "https://ims.banoqabil.online"
+    ].filter(Boolean).map(url => url.replace(/\/$/, ""));
+
     io = new Server(server, {
         cors: {
-            origin: [
-                process.env.ADMIN_URL,
-                process.env.USER_URL,
-            ].filter(Boolean),
+            origin: (origin, callback) => {
+                if (!origin) return callback(null, true);
+                const isAllowed = allowedOrigins.includes(origin) || 
+                                  /^https?:\/\/(?:[a-z0-9-]+\.)*banoqabil\.online$/.test(origin);
+                if (isAllowed) {
+                    callback(null, true);
+                } else {
+                    callback(null, false);
+                }
+            },
             credentials: true,
         },
     });
