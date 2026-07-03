@@ -613,6 +613,11 @@ authController.updateUser = async (req, res, next) => {
       }
     });
 
+    if (req.validatedData.password !== undefined) {
+      const salt = await bcrypt.genSalt(10);
+      updateData.password = await bcrypt.hash(req.validatedData.password, salt);
+    }
+
     await userModel.findByIdAndUpdate(
       _id,
       { $set: updateData },
