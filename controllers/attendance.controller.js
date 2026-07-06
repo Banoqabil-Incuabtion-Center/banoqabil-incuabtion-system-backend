@@ -23,6 +23,47 @@ const normalizeIP = (ip) => {
   return ip;
 };
 
+const dns = require("dns").promises;
+
+// Cache object to store resolved IPs for hostnames (e.g. DDNS)
+const dnsCache = {};
+const DNS_CACHE_TTL = 5 * 60 * 1000; // 5 minutes cache
+
+// Helper to resolve hostnames to IP addresses with a cache
+const resolveHostnames = async (allowedList) => {
+  const resolvedList = [];
+  for (const item of allowedList) {
+    if (!item) continue;
+    // Check if it's an IP (IPv4 or IPv6)
+    const isIP = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/.test(item) || item.includes(":");
+    if (!isIP) {
+      const now = Date.now();
+      const cached = dnsCache[item];
+      if (cached && (now - cached.timestamp < DNS_CACHE_TTL)) {
+        resolvedList.push(cached.ip);
+      } else {
+        try {
+          const { address } = await dns.lookup(item);
+          if (address) {
+            dnsCache[item] = { ip: address, timestamp: now };
+            resolvedList.push(address);
+          }
+        } catch (err) {
+          console.error(`Failed to resolve DDNS hostname "${item}":`, err.message);
+          if (cached) {
+            // Fallback to expired cache if DNS resolution fails
+            resolvedList.push(cached.ip);
+          }
+        }
+      }
+    } else {
+      resolvedList.push(item);
+    }
+  }
+  return resolvedList;
+};
+
+
 // ✅ Get settings (cached for performance)
 let cachedSettings = null;
 let cacheTime = null;
@@ -149,11 +190,13 @@ attendanceController.checkin = async (req, res, next) => {
     }
 
     // IP validation
-    const allowedIPs = [
+    const rawAllowedIPs = [
       process.env.IP_ADDRESS_ONE,
       process.env.IP_ADDRESS_TWO,
       ...settings.allowedIPs
     ].filter(Boolean).map(ip => ip.trim());
+
+    const allowedIPs = await resolveHostnames(rawAllowedIPs);
 
     const rawIP = req.headers["x-forwarded-for"]?.split(",")[0] || req.headers["x-real-ip"] || req.connection.remoteAddress;
     const clientIP = normalizeIP(rawIP);
@@ -161,7 +204,8 @@ attendanceController.checkin = async (req, res, next) => {
     console.log("--- Check-in Debug ---");
     console.log("Raw IP:", rawIP);
     console.log("Normalized IP:", clientIP);
-    console.log("Allowed IPs:", allowedIPs);
+    console.log("Raw Allowed IPs:", rawAllowedIPs);
+    console.log("Resolved Allowed IPs:", allowedIPs);
     console.log("----------------------");
 
     if (allowedIPs.length > 0 && !allowedIPs.includes(clientIP)) {
@@ -169,7 +213,7 @@ attendanceController.checkin = async (req, res, next) => {
       return res.status(403).json({
         error: "Attendance only allowed from incubation network",
         yourIP: clientIP,
-        allowedIPs: allowedIPs // Temporarily show allowed IPs for debugging
+        allowedIPs: rawAllowedIPs // Temporarily show allowed IPs for debugging
       });
     }
 
@@ -270,11 +314,13 @@ attendanceController.checkout = async (req, res, next) => {
       return res.status(403).json({ error: "Unauthorized access: You can only check-out for your own account" });
     }
 
-    const allowedIPs = [
+    const rawAllowedIPs = [
       process.env.IP_ADDRESS_ONE,
       process.env.IP_ADDRESS_TWO,
       ...settings.allowedIPs
     ].filter(Boolean).map(ip => ip.trim());
+
+    const allowedIPs = await resolveHostnames(rawAllowedIPs);
 
     const rawIP = req.headers["x-forwarded-for"]?.split(",")[0] || req.headers["x-real-ip"] || req.connection.remoteAddress;
     const clientIP = normalizeIP(rawIP);
@@ -282,7 +328,8 @@ attendanceController.checkout = async (req, res, next) => {
     console.log("--- Check-out Debug ---");
     console.log("Raw IP:", rawIP);
     console.log("Normalized IP:", clientIP);
-    console.log("Allowed IPs:", allowedIPs);
+    console.log("Raw Allowed IPs:", rawAllowedIPs);
+    console.log("Resolved Allowed IPs:", allowedIPs);
     console.log("-----------------------");
 
     if (allowedIPs.length > 0 && !allowedIPs.includes(clientIP)) {
@@ -290,7 +337,7 @@ attendanceController.checkout = async (req, res, next) => {
       return res.status(403).json({
         error: "Attendance only allowed from incubation network",
         yourIP: clientIP,
-        allowedIPs: allowedIPs // Temporarily show allowed IPs for debugging
+        allowedIPs: rawAllowedIPs // Temporarily show allowed IPs for debugging
       });
     }
 
@@ -1037,16 +1084,20 @@ attendanceController.checkIP = async (req, res) => {
     const rawIP = req.headers["x-forwarded-for"]?.split(",")[0] || req.headers["x-real-ip"] || req.connection.remoteAddress;
     const clientIP = normalizeIP(rawIP);
 
+    const allowedIPs = [
+      process.env.IP_ADDRESS_ONE,
+      process.env.IP_ADDRESS_TWO,
+      ...settings.allowedIPs
+    ].filter(Boolean).map(ip => ip.trim());
+
+    const resolvedIPs = await resolveHostnames(allowedIPs);
+
     res.json({
       rawIP,
       clientIP,
-      allowedIPs: [
-        process.env.IP_ADDRESS_ONE,
-        process.env.IP_ADDRESS_TWO,
-        ...settings.allowedIPs
-      ].filter(Boolean).map(ip => ip.trim()),
+      allowedIPs,
+      resolvedIPs,
       env: {
-        hasEnv1: !!process.env.IP_ADDRESS_ONE,
         hasEnv1: !!process.env.IP_ADDRESS_ONE,
         hasEnv2: !!process.env.IP_ADDRESS_TWO
       }
