@@ -4,6 +4,7 @@ const User = require("../models/user.model");
 const Attendance = require("../models/attendance.model");
 const AttendanceSettings = require("../models/attendance-settings.model");
 const Calendar = require("../models/calendar.model");
+const { sendSlackAlert } = require("../services/slack");
 
 const markAbsentJob = async (options = {}) => {
     const { dryRun = false } = options;
@@ -144,10 +145,33 @@ const markAbsentJob = async (options = {}) => {
         }
 
         console.log(`✅ Absence Job Completed. ${dryRun ? "[DRY RUN] " : ""}Processed ${parsedUsers} users. Absent: ${markedAbsent}, Holiday: ${markedHoliday}.`);
+
+        // Staff digest. Dry runs stay off Slack so test invocations don't page anyone.
+        if (!dryRun) {
+            await sendSlackAlert({
+                title: `Attendance summary — ${targetDateString}`,
+                level: markedAbsent > 0 ? "warning" : "success",
+                fields: {
+                    Absent: markedAbsent,
+                    Holiday: markedHoliday,
+                    "Students processed": parsedUsers,
+                    ...(calendarEvent ? { Calendar: `${calendarEvent.type} — ${calendarEvent.title}` } : {}),
+                },
+            });
+        }
+
         return { success: true, parsedUsers, markedAbsent, markedHoliday, dryRun };
 
     } catch (error) {
         console.error("❌ Error in absence marking job:", error);
+
+        await sendSlackAlert({
+            title: "Attendance cron FAILED",
+            text: "Absences were not marked for the target date. Needs a manual run.",
+            level: "error",
+            fields: { Error: error.message },
+        });
+
         throw error;
     }
 };
