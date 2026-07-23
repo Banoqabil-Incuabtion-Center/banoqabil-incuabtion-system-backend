@@ -42,5 +42,9 @@ router.post("/createproject", validate(ProjectSchema), ProjectController.project
 router.put("/project/:id", validate(UpdateProjectSchema), ProjectController.updateProject)
 router.delete("/project/:id", ProjectController.deleteProject)
 
+// Task board. Unlike the routes above, task.route.js applies `protect` to
+// everything it mounts.
+router.use("/task", require("./task.route"))
+
 
 module.exports = router;

@@ -95,6 +95,18 @@ const initializeSocket = (server) => {
             console.log(`User ${socket.userId} left post room: ${postId}`);
         });
 
+        // Join a project room for real-time task board updates
+        socket.on('join:project', (projectId) => {
+            socket.join(`project:${projectId}`);
+            console.log(`User ${socket.userId} joined project room: ${projectId}`);
+        });
+
+        // Leave a project room
+        socket.on('leave:project', (projectId) => {
+            socket.leave(`project:${projectId}`);
+            console.log(`User ${socket.userId} left project room: ${projectId}`);
+        });
+
         // Typing indicators
         socket.on('typing', ({ receiverId }) => {
             socket.to(receiverId).emit('typing', { userId: socket.userId });
@@ -147,4 +159,12 @@ const emitNotification = (userId, notification) => {
     }
 };
 
-module.exports = { initializeSocket, getIO, emitNotification };
+// Broadcast a task board change to everyone currently viewing that project.
+// Safe to call before initializeSocket (no-ops), so controllers don't need guards.
+const emitToProject = (projectId, event, payload) => {
+    if (io) {
+        io.to(`project:${projectId.toString()}`).emit(event, payload);
+    }
+};
+
+module.exports = { initializeSocket, getIO, emitNotification, emitToProject };
