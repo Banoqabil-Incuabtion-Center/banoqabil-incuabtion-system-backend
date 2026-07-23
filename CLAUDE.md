@@ -56,14 +56,16 @@ Kanban tasks for a project. `models/task.model.js` exports the model with `Task.
 
 Every mutation calls `emitToProject(projectId, event, payload)` → `task:created` / `task:updated` / `task:moved` / `task:deleted`, broadcast to the `project:<id>` socket room.
 
-## Slack staff alerts
+## Job logging
 
-`services/slack.js` posts to a single incoming webhook from `SLACK_WEBHOOK_URL`. Two properties to preserve if you touch it:
+Cron runs are recorded in the **same `Log` collection** the error middleware writes to — no separate alerting service. `models/log.model.js` has a 30-day TTL on `timestamp` and a `level` enum of `error`/`warn`/`info`.
 
-- **Unset env = silent no-op.** Local dev and any deploy without the var configured just skip it.
-- **It never throws.** Network errors are logged and swallowed, because its main caller is the attendance cron — a Slack outage must not stop absences being marked.
+`jobs/attendance.job.js` has a local `writeJobLog` helper that stamps `route: "cron:attendance"` and `method: "CRON"`, so job entries can be filtered apart from HTTP error logs. It writes an `info` entry with the run's counts on success and an `error` entry with the stack on failure. Two properties to preserve:
 
-Currently wired into `jobs/attendance.job.js`: a daily digest on success (suppressed for `dryRun`, so test invocations don't page anyone) and an error-level alert if the job throws.
+- **Dry runs are not logged**, so test invocations don't pollute the collection.
+- **`writeJobLog` never throws.** A failed log write must not take down the job it is reporting on — same reasoning as the fire-and-forget `Log.create` in `error.middleware.js`.
+
+There is no admin-facing UI over `Log` yet; read it straight from Mongo.
 
 ## Sockets
 
@@ -73,7 +75,7 @@ Rooms: `<userId>` (personal, for DMs and notifications), `post:<id>`, and `proje
 
 ## Env vars
 
-`MONGO_URL`, `JWT_SECRET`, `PORT`, `LOCAL_URL`, `ADMIN_URL`, `USER_URL`, `BACKEND_URL`, `CLOUDINARY_CLOUD_NAME/_API_KEY/_API_SECRET`, `SMTP_HOST/_PORT/_USER/_PASS`, `IP_ADDRESS_ONE`, `IP_ADDRESS_TWO`, `SLACK_WEBHOOK_URL` (optional). `.env*` is gitignored here — keep it that way.
+`MONGO_URL`, `JWT_SECRET`, `PORT`, `LOCAL_URL`, `ADMIN_URL`, `USER_URL`, `BACKEND_URL`, `CLOUDINARY_CLOUD_NAME/_API_KEY/_API_SECRET`, `SMTP_HOST/_PORT/_USER/_PASS`, `IP_ADDRESS_ONE`, `IP_ADDRESS_TWO`. `.env*` is gitignored here — keep it that way.
 
 ## Deployment
 
