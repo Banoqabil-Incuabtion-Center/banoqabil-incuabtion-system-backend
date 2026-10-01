@@ -15,5 +15,7 @@ router.use('/api/media', mediaRoute);
 router.use('/api/push', pushRoute);
 router.use('/api/messages', require("./message.route"));
 router.use('/api/calendar', require("./calendar.route"));
+router.use('/api/form-config', require("./formConfig.route"));
+router.use('/api/registration', require("./registration.route"));
 
 module.exports = router;
