@@ -2,6 +2,11 @@ const mongoose = require('mongoose');
 
 const formConfigSchema = new mongoose.Schema(
   {
+    section: {
+      type: String,
+      required: true,
+      trim: true,
+    },
     label: {
       type: String,
       required: true,
@@ -17,6 +22,10 @@ const formConfigSchema = new mongoose.Schema(
       type: String,
       enum: ['text', 'date', 'radio', 'select', 'textarea', 'email', 'number'],
       required: true,
+    },
+    placeholder: {
+      type: String,
+      trim: true,
     },
     required: {
       type: Boolean,

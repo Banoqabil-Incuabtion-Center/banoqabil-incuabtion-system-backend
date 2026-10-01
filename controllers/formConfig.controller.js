@@ -3,7 +3,7 @@ const FormConfig = require('../models/formConfig.model');
 // Add a new dynamic field configuration
 exports.createFormField = async (req, res) => {
   try {
-    const { label, name, type, required, options } = req.body;
+    const { section, label, name, type, placeholder, required, options } = req.body;
 
     const existingField = await FormConfig.findOne({ name });
     if (existingField) {
@@ -11,9 +11,11 @@ exports.createFormField = async (req, res) => {
     }
 
     const newField = new FormConfig({
+      section,
       label,
       name,
       type,
+      placeholder,
       required,
       options,
     });
@@ -30,10 +32,38 @@ exports.createFormField = async (req, res) => {
 exports.getAllFormFields = async (req, res) => {
   try {
     const fields = await FormConfig.find();
-    res.status(200).json({ data: fields });
+    
+    // Group fields by section
+    const groupedFields = fields.reduce((acc, field) => {
+      const sectionName = field.section;
+      if (!acc[sectionName]) {
+        acc[sectionName] = [];
+      }
+      acc[sectionName].push(field);
+      return acc;
+    }, {});
+
+    res.status(200).json({ data: groupedFields });
   } catch (error) {
     console.error('Error fetching form fields:', error);
     res.status(500).json({ message: 'Failed to fetch form fields', error: error.message });
+  }
+};
+
+// Get a single dynamic field configuration by ID
+exports.getFormFieldById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const field = await FormConfig.findById(id);
+
+    if (!field) {
+      return res.status(404).json({ message: 'Form field not found' });
+    }
+
+    res.status(200).json({ data: field });
+  } catch (error) {
+    console.error('Error fetching form field by ID:', error);
+    res.status(500).json({ message: 'Failed to fetch form field', error: error.message });
   }
 };
 
