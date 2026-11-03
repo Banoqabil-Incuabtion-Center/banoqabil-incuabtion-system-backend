@@ -14,7 +14,6 @@ const dashboardController = require("../controllers/dashboard.controller");
 
 router.post("/login", adminController.loginAdmin)
 router.get("/dashboard-stats", dashboardController.getStats)
-router.post("/create", adminController.createAdmin)
 router.post("/refresh-token", adminController.refreshAccessToken)
 router.post("/logout", adminController.logout)
 

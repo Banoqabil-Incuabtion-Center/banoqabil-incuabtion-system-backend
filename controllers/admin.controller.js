@@ -4,24 +4,6 @@ const jwt = require("jsonwebtoken")
 
 const adminController = {}
 
-// ✅ Create admin with hashed password
-adminController.createAdmin = async (req, res) => {
-  try {
-    const plainPassword = "admin1234"
-    const hashedPassword = await bcrypt.hash(plainPassword, 10)
-
-    const admin = await adminModel.create({
-      username: "admin",
-      password: hashedPassword,
-    })
-
-    res.status(201).json({ message: "Admin created", admin })
-  } catch (error) {
-    console.error(error)
-    res.status(500).json({ message: "Server error" })
-  }
-}
-
 adminController.loginAdmin = async (req, res) => {
   try {
     const { username, password } = req.body
