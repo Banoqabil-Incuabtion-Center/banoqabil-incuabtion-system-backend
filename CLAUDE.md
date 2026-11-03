@@ -56,6 +56,19 @@ Kanban tasks for a project. `models/task.model.js` exports the model with `Task.
 
 Every mutation calls `emitToProject(projectId, event, payload)` → `task:created` / `task:updated` / `task:moved` / `task:deleted`, broadcast to the `project:<id>` socket room.
 
+## Registration form (banoqabil.online)
+
+The public landing page (`banoqabil-incubation-center` repo) reads `GET /api/form-config` (public, grouped by section) and posts to `POST /api/registration`. The admin Form Builder edits form-config; the admin Applications page reads submissions.
+
+- `POST /api/registration` runs `validate(RegistrationSchema)` (`validators/registration.validation.js`), which mirrors the landing form's client rules and **normalises** before saving: CNIC → `42101-1234567-1`, phones → `3001234567`, email lowercased, unknown keys stripped, custom builder fields go in `dynamicData`. Keep the two rule sets in step.
+- One live submission per CNIC: a non-deleted match returns **409** with `{ field: "cnicNumber", message }`. The landing form shows `message` as-is.
+- Admin routes (`protect, adminOnly`): `GET /` with `?page&limit(≤100)&search&course&campus&status` returns the `paginate.util` shape plus `statusCounts`. `GET /:id`, `PATCH /:id/status` (`New | Shortlisted | Rejected`), `DELETE /:id` (soft delete via `deletedAt`). Submissions saved before `status` existed have no field and are treated as `New`.
+- `models/formConfig.model.js`'s `type` enum must include every type the Form Builder offers (`phone`, `checkbox` included), or create/update 500s.
+
+## Admin accounts
+
+There is no HTTP route to create an admin (the old public `POST /api/admin/create` with a hardcoded password was removed). Use `NODE_ENV=production node scripts/set-admin-password.js` on the server; it prompts for username and password and upserts the bcrypt hash.
+
 ## Job logging
 
 Cron runs are recorded in the **same `Log` collection** the error middleware writes to — no separate alerting service. `models/log.model.js` has a 30-day TTL on `timestamp` and a `level` enum of `error`/`warn`/`info`.

@@ -20,7 +20,8 @@ const formConfigSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ['text', 'date', 'radio', 'select', 'textarea', 'email', 'number'],
+      // Must cover every type the admin Form Builder offers and the landing form renders
+      enum: ['text', 'date', 'radio', 'select', 'textarea', 'email', 'number', 'phone', 'checkbox'],
       required: true,
     },
     placeholder: {

@@ -27,8 +27,19 @@ const internSubmissionSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.Mixed,
       default: {},
     },
+
+    // Admin review state; submissions made before this field existed read as "New"
+    status: {
+      type: String,
+      enum: ['New', 'Shortlisted', 'Rejected'],
+      default: 'New',
+    },
+    deletedAt: { type: Date, default: null },
   },
   { timestamps: true, strict: false }
 );
+
+// Duplicate-CNIC check on submit
+internSubmissionSchema.index({ cnicNumber: 1, deletedAt: 1 });
 
 module.exports = mongoose.model('InternSubmission', internSubmissionSchema);
