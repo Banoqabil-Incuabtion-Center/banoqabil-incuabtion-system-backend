@@ -161,7 +161,8 @@ authController.signupGet = async (req, res, next) => {
     const query = { deletedAt: null };
 
     if (search) {
-      const searchRegex = { $regex: new RegExp(search, "i") };
+      const escaped = String(search).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const searchRegex = { $regex: new RegExp(escaped, "i") };
       query.$or = [
         { name: searchRegex },
         { email: searchRegex },
@@ -181,7 +182,8 @@ authController.signupGet = async (req, res, next) => {
       limit,
       query,
       sort: { createdAt: -1, _id: 1 },
-      populate: null
+      populate: null,
+      select: userModel.PRIVATE_FIELDS
     });
 
     // Calculate Stats for the report cards

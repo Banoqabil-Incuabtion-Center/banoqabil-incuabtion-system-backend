@@ -182,4 +182,10 @@ userSchema.pre("save", async function (next) {
   next();
 });
 
-module.exports = mongoose.model("user", userSchema);
+const User = mongoose.model("user", userSchema);
+
+// Projection for any list/lookup that leaves the server: secrets and auth/E2E key material, never sent even to admins
+User.PRIVATE_FIELDS =
+  "-password -refreshToken -resetPasswordToken -resetPasswordExpires -verificationToken -verificationTokenExpires -encryptedPrivateKey -privateKeyIv -privateKeySalt";
+
+module.exports = User;

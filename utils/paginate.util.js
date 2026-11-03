@@ -5,13 +5,18 @@ const paginate = async ({
   limit = 10,
   query = {},
   sort = { createdAt: -1, _id: 1 },
-  populate = null
+  populate = null,
+  select = null
 }) => {
   const skip = (page - 1) * limit;
 
   const total = await model.countDocuments(query);
 
   let dbQuery = model.find(query).sort(sort).skip(skip).limit(limit);
+
+  if (select) {
+    dbQuery = dbQuery.select(select);
+  }
 
   if (populate) {
     dbQuery = dbQuery.populate(populate);

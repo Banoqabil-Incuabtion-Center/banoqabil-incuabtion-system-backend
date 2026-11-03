@@ -5,12 +5,13 @@ const attController = require("../controllers/attendance.controller")
 const validate = require("../middlewares/form-validator.middleware")
 const { registerSchema, updateRegisterSchema, loginSchema } = require("../validators/auth.validation");
 const { createPostSchema, updatePostSchema } = require("../validators/post.validation");
-const { protect } = require("../middlewares/auth.middleware");
+const { protect, adminOnly } = require("../middlewares/auth.middleware");
 const userPostController = require("../controllers/user-post.controller");
 const { uploadPostImage, uploadAvatar } = require("../config/multer.config");
 
 //admin access users
-router.get("/signup", authController.signupGet)
+// Admin Students list: full student records, so admin-only and stripped of secrets in the controller
+router.get("/signup", protect, adminOnly, authController.signupGet)
 router.post("/signup", validate(registerSchema), authController.signupPost)
 router.post("/login", validate(loginSchema), authController.loginPost)
 router.get("/profile", protect, authController.loginGet)
