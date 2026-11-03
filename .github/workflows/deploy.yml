@@ -36,5 +36,5 @@ jobs:
           script: |
             cd /var/www/banoqabil-ims/api
             npm install --omit=dev
-            pm2 reload api || pm2 start app.js --name "api"
+            pm2 reload api || NODE_ENV=production pm2 start app.js --name "api"
             pm2 save
