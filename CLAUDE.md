@@ -15,7 +15,7 @@ app.js            entry: env load → db connect → cron init → socket init �
 routes/           thin; index.route.js mounts everything under /api/*
 controllers/      all business logic lives here
 models/           mongoose schemas, lowercase model names ("user", "team", "PM")
-middlewares/      auth (protect/optionalProtect), error, zod validator, objectId check
+middlewares/      auth (protect/optionalProtect/adminOnly), error, zod validator, objectId check
 validators/       zod schemas consumed by form-validator.middleware
 config/           db.config.js, multer.config.js (Cloudinary storage)
 services/         sendEmail.js (nodemailer)

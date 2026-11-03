@@ -32,6 +32,14 @@ exports.protect = (req, res, next) => {
   }
 };
 
+// Run after protect. Only admin tokens carry role "admin"; student tokens carry no role.
+exports.adminOnly = (req, res, next) => {
+  if (req.user?.role !== "admin") {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+  next();
+};
+
 exports.optionalProtect = (req, res, next) => {
   let token;
 
